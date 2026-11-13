@@ -22,7 +22,7 @@ android {
         // Android TV 5.0 / Fire OS 5 — самые старые поддерживаемые приставки
         minSdk = 21
         targetSdk = 35
-        versionCode = 1
+        versionCode = 2
         versionName = "0.1.0"
 
         // Репозиторий GitHub, откуда приходят обновления (owner/name)
