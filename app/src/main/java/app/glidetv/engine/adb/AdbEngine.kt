@@ -8,6 +8,7 @@ import app.glidetv.engine.Query
 import app.glidetv.engine.ShellCmd
 import app.glidetv.engine.ShellResult
 import app.glidetv.engine.parseExitCode
+import app.glidetv.engine.readUntilExitMarker
 import app.glidetv.engine.wrapWithExitCode
 import app.glidetv.util.Logx
 import io.github.muntashirakon.adb.AdbPairingRequiredException
@@ -48,38 +49,48 @@ class AdbEngine(context: Context, private val selfPkg: PackageName) : Privileged
         r.ok && r.output.contains("uid=")
     }
 
-    override suspend fun run(cmd: ShellCmd): ShellResult = runRaw(cmd.render(selfPkg), timeoutMs = 180_000)
+    override suspend fun run(cmd: ShellCmd): ShellResult {
+        val command = cmd.render(selfPkg)
+        val started = System.currentTimeMillis()
+        val r = runRaw(command, timeoutMs = 180_000)
+        val ms = System.currentTimeMillis() - started
+        val brief = r.output.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().take(80)
+        Logx.i("adb: ${command.take(60)} → ${r.exitCode} (${ms} мс)${if (brief.isNotEmpty()) " $brief" else ""}")
+        return r
+    }
 
     private suspend fun runRaw(command: String, timeoutMs: Long): ShellResult = mutex.withLock {
         withContext(Dispatchers.IO) {
             try {
                 val stream = manager.openStream("shell:" + wrapWithExitCode(command))
                 val out = ByteArrayOutputStream()
-                coroutineScope {
+                val gotMarker = coroutineScope {
                     val watchdog = launch {
                         delay(timeoutMs)
+                        Logx.w("adb: таймаут ${timeoutMs / 1000} с: ${command.take(60)}")
                         runCatching { stream.close() }
                     }
-                    val input = stream.openInputStream()
-                    val buf = ByteArray(8192)
-                    try {
-                        while (true) {
-                            val n = input.read(buf, 0, buf.size)
-                            if (n < 0) break
-                            out.write(buf, 0, n)
-                        }
-                    } catch (_: IOException) {
-                        // поток закрыт: adbd завершил команду или сработал watchdog
-                    }
+                    // Не ждём EOF: libadb 3.1.1 может его не отдать, и тогда команда «висит» до таймаута
+                    val ok = readUntilExitMarker(stream.openInputStream(), out)
                     watchdog.cancel()
+                    ok
                 }
-                runCatching { stream.close() }
+                if (gotMarker) {
+                    // Поток уже не нужен; если библиотека зависнет на закрытии, очередь команд не встанет
+                    closeQuietlyInBackground(stream)
+                } else {
+                    runCatching { stream.close() }
+                }
                 parseExitCode(out.toString("UTF-8"))
             } catch (t: Throwable) {
                 Logx.w("adb shell", t)
                 ShellResult(-1, t.message ?: t.javaClass.simpleName)
             }
         }
+    }
+
+    private fun closeQuietlyInBackground(stream: java.io.Closeable) {
+        Thread({ runCatching { stream.close() } }, "glide-adb-close").apply { isDaemon = true }.start()
     }
 
     override fun close() {

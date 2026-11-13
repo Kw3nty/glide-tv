@@ -144,6 +144,8 @@ class DebloatScreen(activity: MainActivity) : Screen(activity) {
         }
         dialog(string(R.string.apply_confirm_title), message, positive = R.string.apply, negative = android.R.string.cancel) {
             busy = true
+            status.text = string(if (toDisable.isNotEmpty()) R.string.progress_disable else R.string.progress_enable,
+                0, if (toDisable.isNotEmpty()) toDisable.size else toEnable.size)
             scope.launch {
                 try {
                     val disabled = graph.debloatExecutor.disable(toDisable) { i, n ->

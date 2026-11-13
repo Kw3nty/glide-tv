@@ -28,7 +28,8 @@ class DebloatExecutor(
         if (!platform.canDisablePackages) return pkgs.map { PackageOutcome(it, false, "firmware refuses") }
 
         val safe = pkgs.filterNot { CoreGuard.isNever(it) }
-        val wifiOwnedBySetup = setupWizardOwnsWifi()
+        // `dumpsys wifi` тяжёлый (секунды на слабых ТВ): запускаем, только если мастер настройки в списке
+        val wifiOwnedBySetup = if (SETUP_WIZARD in safe) setupWizardOwnsWifi() else null
         val out = mutableListOf<PackageOutcome>()
         safe.forEachIndexed { i, pkg ->
             onProgress(i + 1, safe.size)

@@ -34,6 +34,9 @@
     <!-- Переподключение «Турбо» после перезагрузки (Android 11+) -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Библиотеки без targetSdk неявно добавляют это разрешение; Glide TV оно не нужно -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" tools:node="remove" />
+
     <application
         android:name=".GlideApp"
         android:allowBackup="false"
