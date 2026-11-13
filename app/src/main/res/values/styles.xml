@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Только фреймворковая тема (API 21+): без AppCompat/Material Components -->
+    <style name="Theme.Glide" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/glide_bg</item>
+        <item name="android:colorPrimary">@color/glide_bg</item>
+        <item name="android:colorPrimaryDark">@color/glide_bg_deep</item>
+        <item name="android:colorAccent">@color/glide_accent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+    </style>
+</resources>

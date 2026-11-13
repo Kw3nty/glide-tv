@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">Glide TV</string>
+
+    <string-array name="byte_units">
+        <item>B</item>
+        <item>KB</item>
+        <item>MB</item>
+        <item>GB</item>
+        <item>TB</item>
+    </string-array>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Home</string>
+    <string name="nav_clean">Cleanup</string>
+    <string name="nav_apps">Unneeded apps</string>
+    <string name="nav_turbo">Turbo</string>
+    <string name="nav_settings">Settings</string>
+
+    <string name="turbo_connecting">Turbo: connecting…</string>
+    <string name="turbo_on_adb">Turbo: on</string>
+    <string name="turbo_on_root">Turbo: on (root)</string>
+    <string name="turbo_off">Turbo: off</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Your TV</string>
+    <string name="ram">Memory (RAM)</string>
+    <string name="storage">Storage</string>
+    <string name="free_of">%1$s free of %2$s</string>
+    <string name="turbo_card_off_title">Turbo is off</string>
+    <string name="turbo_card_off_text">Basic cleanup works now. Turn on Turbo to clear the cache of all apps, switch off preinstalled junk and speed up app launches.</string>
+    <string name="turbo_card_on_title">Turbo is on</string>
+    <string name="turbo_card_on_adb">Built-in ADB connection is active.</string>
+    <string name="turbo_card_on_root">Root access is used.</string>
+    <string name="optimize">Optimize</string>
+    <string name="toggle_free_ram_on">☑ Free up RAM</string>
+    <string name="toggle_free_ram_off">☐ Free up RAM</string>
+    <string name="optimize_honest_note">Glide TV shows only real measured results. Android manages memory by itself, so freeing RAM is most useful right before launching a heavy app or game.</string>
+    <string name="step_caches">Clearing app caches…</string>
+    <string name="step_ram">Freeing memory…</string>
+    <string name="report_title">Done</string>
+    <string name="report_storage">Storage freed: %1$s</string>
+    <string name="report_ram">RAM freed: %1$s</string>
+    <string name="report_step_failed">Step failed: %1$s</string>
+    <string name="report_needs_turbo">Some steps need Turbo on this Android version (cache of all apps / background apps of Android 14+).</string>
+
+    <!-- Cleanup -->
+    <string name="clean_title">Cleanup</string>
+    <string name="clear_all_caches">Clear cache of all apps</string>
+    <string name="find_junk">Find junk files</string>
+    <string name="delete_selected_empty">Delete selected</string>
+    <string name="delete_selected">Delete selected (%1$d, %2$s)</string>
+    <string name="top_caches">Largest app caches</string>
+    <string name="need_usage_access">To show app cache sizes, turn on Turbo or allow usage access for Glide TV.</string>
+    <string name="loading">Loading…</string>
+    <string name="cache_total">App caches in total: %1$s</string>
+    <string name="need_turbo_title">Turbo required</string>
+    <string name="need_turbo_caches">Since Android 6, only system apps may clear the cache of other apps. Turbo gives Glide TV these rights through the TV\'s own debugging mode — no computer needed.</string>
+    <string name="open_turbo">Turn on Turbo</string>
+    <string name="caches_cleared">Caches cleared, %1$s freed</string>
+    <string name="operation_failed">The operation failed. Details are in the Turbo log.</string>
+    <string name="scanning">Scanning storage…</string>
+    <string name="junk_found">Found: %1$d items, %2$s</string>
+    <string name="junk_none">No junk found.</string>
+    <string name="junk_hint">Installer files (APK) are not selected by default — check them if you no longer need them.</string>
+    <string name="delete_confirm_title">Delete files?</string>
+    <string name="delete_confirm_text">%1$d items, %2$s will be deleted permanently.</string>
+    <string name="delete">Delete</string>
+    <string name="deleted">Deleted, %1$s freed</string>
+    <string name="need_storage_access">Storage access was not granted.</string>
+    <string name="need_storage_access_turbo">This TV has no \"All files access\" screen. Turn on Turbo — Glide TV will grant it automatically.</string>
+    <string name="junk_apk">Installer file (APK)</string>
+    <string name="junk_temp">Log / temporary file</string>
+    <string name="junk_thumbs">Thumbnail cache</string>
+    <string name="junk_ext_cache">App cache in shared storage</string>
+    <string name="junk_empty_dir">Empty folder</string>
+
+    <!-- Unneeded apps -->
+    <string name="apps_title">Unneeded apps</string>
+    <string name="apps_profile">Checked list for your model: %1$s</string>
+    <string name="apps_no_profile">Your model is not in the database yet — recommendations are based on %1$d checked TVs.</string>
+    <string name="apps_fireos5">Fire OS 5 does not allow disabling apps. Cleanup and RAM features still work.</string>
+    <string name="apps_need_turbo">Disabling apps requires Turbo.</string>
+    <string name="apps_hint">A check mark means \"disabled\". Nothing is uninstalled — every app can be turned back on with one button.</string>
+    <string name="apply_selection">Apply</string>
+    <string name="apply_selection_n">Apply (disable %1$d, enable %2$d)</string>
+    <string name="restore_all">Restore all</string>
+    <string name="restore_all_n">Restore all (%1$d)</string>
+    <string name="badge_disabled_by_glide">disabled</string>
+    <string name="badge_caution">caution</string>
+    <string name="badge_app">app</string>
+    <string name="badge_recommended">recommended</string>
+    <string name="disabled_by_others">disabled on %1$d other TVs</string>
+    <string name="apply_confirm_title">Apply changes?</string>
+    <string name="apply_confirm">Disable: %1$d, enable: %2$d.</string>
+    <string name="apply_confirm_risky">These may be in use (voice search, casting, screensaver or regular apps):</string>
+    <string name="apply_confirm_reversible">Apps are only disabled, not removed. \"Restore all\" brings everything back.</string>
+    <string name="apply">Apply</string>
+    <string name="progress_disable">Disabling %1$d of %2$d…</string>
+    <string name="progress_enable">Enabling %1$d of %2$d…</string>
+    <string name="apply_done">Disabled: %1$d, enabled: %2$d.</string>
+    <string name="apply_failed_n">Failed: %1$d.</string>
+    <string name="apply_failed_title">Some apps could not be changed</string>
+    <string name="restore_confirm_title">Restore all?</string>
+    <string name="restore_confirm_text">All apps disabled by Glide TV will be enabled again.</string>
+    <string name="restore">Restore</string>
+    <string name="restore_done">Enabled: %1$d.</string>
+    <string name="risk_voice">voice search and the mic button stop working</string>
+    <string name="risk_cast">casting from a phone (Chromecast) stops working</string>
+    <string name="risk_remote_apps">on some devices the phone remote app stops working</string>
+    <string name="risk_screensaver">screensaver / Ambient mode</string>
+    <string name="risk_accessibility">accessibility (screen reader, speech)</string>
+    <string name="risk_live_tv">Live TV channels and the Live button</string>
+    <string name="risk_input_key">on some TVs it handles the Input button</string>
+
+    <!-- Turbo -->
+    <string name="turbo_title">Turbo</string>
+    <string name="turbo_subtitle">Turbo uses the TV\'s own debugging mode (ADB) to get the rights needed for full cleanup. No computer and no extra apps are needed.</string>
+    <string name="turbo_state_adb">✅ Turbo is on (built-in ADB)</string>
+    <string name="turbo_state_root">✅ Turbo is on (root)</string>
+    <string name="turbo_state_off">Turbo is off</string>
+    <string name="steps_fire_tv">1. Press \"Open developer options\" (or: Settings → My Fire TV → Developer options).\n   If there is no such menu: Settings → My Fire TV → About → press OK on the device name 7 times.\n2. Turn on \"ADB debugging\".\n3. Come back and press \"Connect\".\n4. A dialog \"Allow USB debugging?\" appears — check \"Always allow\" and press OK.</string>
+    <string name="steps_usb_debug">1. Settings → Device Preferences → About → press OK on \"Build\" 7 times.\n2. Back → Developer options → turn on \"USB debugging\" (and \"Network debugging\" if present).\n3. Come back and press \"Connect\".\n4. A dialog \"Allow USB debugging?\" appears — check \"Always allow\" and press OK.</string>
+    <string name="steps_usb_debug_11">1. Settings → Device Preferences → About → press OK on \"Build\" 7 times.\n2. Back → Developer options → turn on \"USB debugging\".\n3. Press \"Connect\" and confirm \"Allow USB debugging?\" (check \"Always allow\").\n4. If it does not connect: turn on \"Wireless debugging\" and use \"Pair with code\".</string>
+    <string name="steps_wireless">1. Settings → System → About → press OK on \"Android TV OS build\" 7 times.\n2. Back → Developer options → turn on \"Wireless debugging\".\n3. Press \"Pair with code\" here, then on the TV open Wireless debugging → \"Pair device with pairing code\".\n4. Scan the QR code with your phone and type the 6 digits from the TV screen. The TV dialog must stay open.</string>
+    <string name="open_dev_settings">Open developer options</string>
+    <string name="dev_settings_missing">Developer options are hidden. Unlock them first (see step 1).</string>
+    <string name="connect">Connect</string>
+    <string name="pair_by_code">Pair with code</string>
+    <string name="use_root">Use root</string>
+    <string name="pairing_phone_title">Enter the code from your phone</string>
+    <string name="pairing_phone_text">The pairing dialog on the TV closes as soon as you switch apps, so the code is entered on a phone connected to the same Wi-Fi.</string>
+    <string name="pairing_manual">Or enter the code here (if your TV keeps the dialog open):</string>
+    <string name="pair">Pair</string>
+    <string name="pairing_waiting_dialog">Waiting for the \"Pair device with pairing code\" dialog on the TV…</string>
+    <string name="pairing_port_found">Pairing dialog found (port %1$d). Enter the 6 digits.</string>
+    <string name="pairing_code_invalid">The code must have 6 digits.</string>
+    <string name="pairing_open_dialog_first">Open \"Pair device with pairing code\" on the TV first and keep it open.</string>
+    <string name="pairing_failed">Pairing failed: %1$s</string>
+    <string name="pairing_success">Done! Turbo is on — go back to the TV.</string>
+    <string name="pairing_paired_not_connected">Paired, but could not connect. Make sure Wireless debugging stays on and press \"Connect\".</string>
+    <string name="pairing_required">This TV needs pairing (Wireless debugging).</string>
+    <string name="no_network">No local network connection — connect the TV to Wi-Fi or Ethernet.</string>
+    <string name="connecting_confirm">Connecting… If a dialog \"Allow debugging?\" appears, check \"Always allow\" and press OK.</string>
+    <string name="turbo_connected">✅ Connected. Glide TV granted itself the required rights.</string>
+    <string name="connect_unauthorized">Debugging was not allowed. Press \"Connect\" again and confirm the dialog on the screen.</string>
+    <string name="connect_failed">Could not reach the debugging service. Check that debugging is on (step 2).</string>
+    <string name="root_requesting">Requesting root access… confirm it in the root manager.</string>
+    <string name="root_denied">Root access was denied.</string>
+    <string name="disable_debugging">Turn off debugging</string>
+    <string name="disable_debugging_text">Debugging on the TV will be turned off and Turbo will stop working until you turn it on again. Cleanup results stay.</string>
+    <string name="disable">Turn off</string>
+    <string name="forget_turbo">Forget connection</string>
+    <string name="log">Log</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="language">Language</string>
+    <string name="lang_system">System</string>
+    <string name="animations">Interface animations</string>
+    <string name="animations_hint">Shorter animations make the TV menu feel faster. Requires Turbo.</string>
+    <string name="anim_off">Off</string>
+    <string name="default_value">default</string>
+    <string name="speedup_apps">Faster app launch</string>
+    <string name="speedup_apps_hint">Pre-compiles installed apps (Netflix, YouTube, IPTV…). Cold start becomes noticeably faster. After an app update, run it again. Requires Turbo, Android 7+. May take a few minutes.</string>
+    <string name="speedup_run">Speed up apps</string>
+    <string name="speedup_reset">Reset to default</string>
+    <string name="speedup_progress">%1$d / %2$d: %3$s</string>
+    <string name="speedup_done">Done: %1$d of %2$d apps.</string>
+    <string name="speedup_unsupported">Available on Android 7 and newer.</string>
+    <string name="need_turbo_short">Turn on Turbo first.</string>
+    <string name="done">Done.</string>
+    <string name="updates">Updates</string>
+    <string name="check_updates">Check for updates</string>
+    <string name="checking">Checking…</string>
+    <string name="update_unavailable">Could not check for updates (no internet or no releases yet).</string>
+    <string name="update_latest">You have the latest version (%1$s).</string>
+    <string name="update_found">Version %1$s is available</string>
+    <string name="update_install">Download and install</string>
+    <string name="update_allow_unknown">Allow Glide TV to install apps, then press the button again.</string>
+    <string name="downloading">Downloading the update…</string>
+    <string name="update_failed">Update failed: %1$s</string>
+    <string name="about_title">Glide TV %1$s</string>
+    <string name="about_text">Database of unneeded apps: %1$d TV models (CleanYourTV, revision %2$s).</string>
+    <string name="licenses">Open-source components: CleanYourTV lists (MIT), libadb-android (Apache-2.0), Bouncy Castle (MIT), ZXing (Apache-2.0), HiddenApiBypass (Apache-2.0), Kotlin coroutines (Apache-2.0).</string>
+</resources>

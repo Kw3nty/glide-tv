@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="glide_bg">#0B1B3A</color>
+    <color name="glide_bg_deep">#081430</color>
+    <color name="glide_accent">#3EE6FF</color>
+</resources>
