@@ -25,7 +25,6 @@ import app.glidetv.ui.widgets.dp
 import app.glidetv.ui.widgets.horizontal
 import app.glidetv.ui.widgets.iconView
 import app.glidetv.ui.widgets.lp
-import app.glidetv.ui.widgets.screenHeader
 import app.glidetv.ui.widgets.text
 import app.glidetv.ui.widgets.tvListView
 import app.glidetv.ui.widgets.vertical
@@ -60,43 +59,43 @@ class CleanScreen(activity: MainActivity) : Screen(activity) {
     private var cacheJob: Job? = null
 
     override fun createView(): View = ctx.vertical {
-        // Подзаголовка нет: карточки сами объясняют, что делает каждая кнопка, а месту под списком тесно
-        screenHeader(string(R.string.clean_title))
+        // Одна строка пояснения вместо описаний в карточках: по высоте (≈486dp на ТВ 1080p) тесно, место нужно списку
+        addSpaced(ctx.text(string(R.string.clean_title), Type.TITLE, bold = true), 2)
+        addSpaced(ctx.text(string(R.string.clean_hint), Type.CAPTION, Palette.TEXT_DIM).apply { maxLines = 1 }, 16)
 
         val cards = ctx.horizontal { gravity = android.view.Gravity.TOP }
         clearCacheButton = ctx.actionButton(string(R.string.clear_all_caches), primary = true, iconRes = R.drawable.ic_clean) { clearCaches() }
-        cards.addSpaced(optionCard(R.drawable.ic_memory, R.string.cache_card_title, R.string.cache_card_text, clearCacheButton).also {
+        cards.addSpaced(optionCard(R.drawable.ic_memory, R.string.cache_card_title, clearCacheButton).also {
             cacheValue = it.tag as TextView
         }, 24, lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         findJunkButton = ctx.actionButton(string(R.string.find_junk), iconRes = R.drawable.ic_search) { scanJunk() }
-        cards.addSpaced(optionCard(R.drawable.ic_folder, R.string.junk_card_title, R.string.junk_card_text, findJunkButton).also {
+        cards.addSpaced(optionCard(R.drawable.ic_folder, R.string.junk_card_title, findJunkButton).also {
             junkValue = it.tag as TextView
         }, 0, lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
-        addSpaced(cards, 20)
+        addSpaced(cards, 12)
 
-        status = StatusView(ctx).also { addSpaced(it, 16) }
+        status = StatusView(ctx).also { addSpaced(it, 12) }
 
         val listHeader = ctx.horizontal()
         listTitle = ctx.text(string(R.string.top_caches), Type.SECTION, bold = true)
         listHeader.addView(listTitle, lp(0, WRAP, 1f))
         deleteButton = ctx.actionButton(string(R.string.delete_selected_empty), primary = true, iconRes = R.drawable.ic_trash) { deleteSelected() }
         listHeader.addView(deleteButton, LinearLayout.LayoutParams(WRAP, WRAP))
-        addSpaced(listHeader, 12)
+        addSpaced(listHeader, 8)
 
         emptyText = ctx.text("", Type.SECONDARY, Palette.TEXT_DIM).apply { visibility = View.GONE }
         addSpaced(emptyText, 8)
         addView(ctx.tvListView(adapter), lp(height = 0, weight = 1f))
     }
 
-    /** Карточка-вариант: заголовок и крупное значение в одной строке, пояснение, кнопка. Значение — в tag. */
-    private fun optionCard(iconRes: Int, title: Int, body: Int, button: TextView): LinearLayout = ctx.card(paddingDp = 20) {
-        val value = ctx.text("—", Type.SECTION, bold = true)
+    /** Карточка-вариант: заголовок и значение в одной строке, под ними кнопка. Значение — в tag. */
+    private fun optionCard(iconRes: Int, title: Int, button: TextView): LinearLayout = ctx.card(paddingDp = 16) {
+        val value = ctx.text("—", Type.SECTION, bold = true).apply { maxLines = 1 }
         addView(ctx.horizontal {
             addSpaced(ctx.iconView(iconRes, Palette.ACCENT), 12)
-            addView(ctx.text(string(title), Type.BODY, bold = true), lp(0, WRAP, 1f))
+            addView(ctx.text(string(title), Type.BODY, bold = true).apply { maxLines = 1 }, lp(0, WRAP, 1f))
             addView(value, LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(12) })
-        }, lp().apply { bottomMargin = dp(6) })
-        addView(ctx.text(string(body), Type.CAPTION, Palette.TEXT_DIM), lp(weight = 1f).apply { bottomMargin = dp(16) })
+        }, lp().apply { bottomMargin = dp(12) })
         addView(button, LinearLayout.LayoutParams(WRAP, WRAP))
         tag = value
     }

@@ -1,6 +1,7 @@
 package app.glidetv.ui
 
 import android.content.res.ColorStateList
+import android.graphics.Rect
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -207,6 +208,8 @@ class DashboardScreen(activity: MainActivity) : Screen(activity) {
         }
         if (report.needsTurbo) line(string(R.string.report_needs_turbo), Tone.WARN)
         resultCard.visibility = View.VISIBLE
+        // Карточка без фокуса: пультом до неё не прокрутить, поэтому показываем её сами
+        resultCard.post { resultCard.requestRectangleOnScreen(Rect(0, 0, resultCard.width, resultCard.height)) }
     }
 
     private fun stepName(step: OptimizeStep) =
