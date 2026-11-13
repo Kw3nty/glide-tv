@@ -23,7 +23,13 @@ $new = Read-Host "Новая версия [$suggest]"
 if ([string]::IsNullOrWhiteSpace($new)) { $new = $suggest }
 if ($new -notmatch '^\d+\.\d+\.\d+$') { throw "Версия должна быть вида 1.2.3" }
 $tag = "v$new"
-if (git tag --list $tag) { throw "Тег $tag уже существует." }
+if (git tag --list $tag) {
+    # Тег мог остаться от прошлого запуска, который не смог отправить изменения: если на GitHub его нет — пересоздаём
+    git ls-remote --exit-code --tags origin "refs/tags/$tag" *> $null
+    if ($LASTEXITCODE -eq 0) { throw "Тег $tag уже есть на GitHub. Выберите другую версию." }
+    Say "Удаляю локальный тег $tag от прошлой неудачной попытки." 'Yellow'
+    Run git @('tag', '-d', $tag)
+}
 
 $text = [regex]::Replace($text, 'versionCode\s*=\s*\d+', "versionCode = $($code + 1)")
 $text = [regex]::Replace($text, 'versionName\s*=\s*"[^"]+"', "versionName = `"$new`"")
@@ -31,8 +37,11 @@ $text = [regex]::Replace($text, 'versionName\s*=\s*"[^"]+"', "versionName = `"$n
 
 Run git @('add', '-A')
 Run git @('commit', '-m', "Release $tag")
-Run git @('tag', '-a', $tag, '-m', "Glide TV $new")
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+# На GitHub могли появиться изменения (например, слитый Pull Request) — забираем их до тега и push
+Say "Забираю изменения с GitHub..." 'Cyan'
+Run git @('pull', '--no-rebase', '--no-edit', 'origin', $branch)
+Run git @('tag', '-a', $tag, '-m', "Glide TV $new")
 Run git @('push', 'origin', $branch)
 Run git @('push', 'origin', $tag)
 

@@ -87,6 +87,12 @@ if (-not $origin) {
 }
 
 # 5. Отправка (при первом push откроется окно входа в GitHub — Git Credential Manager)
+# Если на GitHub уже есть новые коммиты (слитый Pull Request и т. п.) — сначала забираем их
+git ls-remote --exit-code --heads origin $branch *> $null
+if ($LASTEXITCODE -eq 0) {
+    Say "Забираю изменения с GitHub..." 'Cyan'
+    Run git @('pull', '--no-rebase', '--no-edit', 'origin', $branch)
+}
 Say "Отправляю ветку $branch в $origin ..." 'Cyan'
 Run git @('push', '-u', 'origin', $branch)
 
