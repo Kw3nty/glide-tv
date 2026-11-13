@@ -24,13 +24,13 @@
     <string name="storage">Хранилище</string>
     <string name="free_of">Свободно %1$s из %2$s</string>
     <string name="turbo_card_off_title">Турбо выключено</string>
-    <string name="turbo_card_off_text">Базовая очистка уже работает. Включите Турбо, чтобы очищать кеш всех приложений, отключать встроенный мусорный софт и ускорять запуск приложений.</string>
+    <string name="turbo_card_off_text">Включите, чтобы чистить кеш всех приложений, отключать лишний софт и ускорять запуск.</string>
     <string name="turbo_card_on_title">Турбо включено</string>
     <string name="turbo_card_on_adb">Встроенное ADB-подключение активно.</string>
     <string name="turbo_card_on_root">Используется root-доступ.</string>
     <string name="optimize">Оптимизировать</string>
-    <string name="toggle_free_ram_on">☑ Освобождать RAM</string>
-    <string name="toggle_free_ram_off">☐ Освобождать RAM</string>
+    <string name="toggle_free_ram_on">Освобождать RAM: вкл</string>
+    <string name="toggle_free_ram_off">Освобождать RAM: выкл</string>
     <string name="optimize_honest_note">Glide TV показывает только реально измеренный результат. Android сам управляет памятью, поэтому освобождать RAM полезнее всего прямо перед запуском тяжёлого приложения или игры.</string>
     <string name="step_caches">Очистка кеша приложений…</string>
     <string name="step_ram">Освобождение памяти…</string>
@@ -41,8 +41,8 @@
     <string name="report_needs_turbo">На этой версии Android часть шагов требует Турбо (кеш всех приложений / фоновые приложения на Android 14+).</string>
 
     <string name="clean_title">Очистка</string>
-    <string name="clear_all_caches">Очистить кеш всех приложений</string>
-    <string name="find_junk">Найти мусорные файлы</string>
+    <string name="clear_all_caches">Очистить кеш</string>
+    <string name="find_junk">Найти мусор</string>
     <string name="delete_selected_empty">Удалить выбранное</string>
     <string name="delete_selected">Удалить выбранное (%1$d, %2$s)</string>
     <string name="top_caches">Самый большой кеш</string>
@@ -57,7 +57,7 @@
     <string name="scanning">Сканирование памяти…</string>
     <string name="junk_found">Найдено: %1$d, %2$s</string>
     <string name="junk_none">Мусор не найден.</string>
-    <string name="junk_hint">Установочные файлы (APK) не отмечены по умолчанию — отметьте их, если они больше не нужны.</string>
+    <string name="junk_hint">APK не отмечены по умолчанию — отметьте их, если они больше не нужны.</string>
     <string name="delete_confirm_title">Удалить файлы?</string>
     <string name="delete_confirm_text">Будет безвозвратно удалено: %1$d, %2$s.</string>
     <string name="delete">Удалить</string>
@@ -77,7 +77,7 @@
     <string name="apps_need_turbo">Для отключения приложений нужно Турбо.</string>
     <string name="apps_hint">Галочка = «отключено». Ничего не удаляется — любое приложение включается обратно одной кнопкой.</string>
     <string name="apply_selection">Применить</string>
-    <string name="apply_selection_n">Применить (отключить %1$d, включить %2$d)</string>
+    <string name="apply_selection_n">Применить (−%1$d, +%2$d)</string>
     <string name="restore_all">Вернуть всё</string>
     <string name="restore_all_n">Вернуть всё (%1$d)</string>
     <string name="badge_disabled_by_glide">отключено</string>
@@ -109,14 +109,14 @@
 
     <string name="turbo_title">Турбо</string>
     <string name="turbo_subtitle">Турбо использует встроенный режим отладки телевизора (ADB), чтобы получить права для полной очистки. Компьютер и дополнительные приложения не нужны.</string>
-    <string name="turbo_state_adb">✅ Турбо включено (встроенный ADB)</string>
-    <string name="turbo_state_root">✅ Турбо включено (root)</string>
+    <string name="turbo_state_adb">Турбо включено (встроенный ADB)</string>
+    <string name="turbo_state_root">Турбо включено (root)</string>
     <string name="turbo_state_off">Турбо выключено</string>
-    <string name="steps_fire_tv">1. Нажмите «Открыть настройки разработчика» (или: Настройки → My Fire TV → Параметры разработчика).\n   Если такого пункта нет: Настройки → My Fire TV → О устройстве → 7 раз нажмите OK на названии устройства.\n2. Включите «Отладка ADB».\n3. Вернитесь и нажмите «Подключиться».\n4. Появится окно «Разрешить отладку по USB?» — отметьте «Всегда разрешать» и нажмите OK.</string>
+    <string name="steps_fire_tv">1. Нажмите «Для разработчиков» (или: Настройки → My Fire TV → Параметры разработчика).\n   Если такого пункта нет: Настройки → My Fire TV → О устройстве → 7 раз нажмите OK на названии устройства.\n2. Включите «Отладка ADB».\n3. Вернитесь и нажмите «Подключиться».\n4. Появится окно «Разрешить отладку по USB?» — отметьте «Всегда разрешать» и нажмите OK.</string>
     <string name="steps_usb_debug">1. Настройки → Настройки устройства → Об устройстве → 7 раз нажмите OK на «Сборка».\n2. Назад → Для разработчиков → включите «Отладка по USB» (и «Отладка по сети», если есть).\n3. Вернитесь и нажмите «Подключиться».\n4. Появится окно «Разрешить отладку по USB?» — отметьте «Всегда разрешать» и нажмите OK.</string>
     <string name="steps_usb_debug_11">1. Настройки → Настройки устройства → Об устройстве → 7 раз нажмите OK на «Сборка».\n2. Назад → Для разработчиков → включите «Отладка по USB».\n3. Нажмите «Подключиться» и подтвердите «Разрешить отладку по USB?» (отметьте «Всегда разрешать»).\n4. Если не подключается: включите «Отладка по Wi-Fi» и нажмите «Сопряжение по коду».</string>
     <string name="steps_wireless">1. Настройки → Система → Об устройстве → 7 раз нажмите OK на «Сборка ОС Android TV».\n2. Назад → Для разработчиков → включите «Отладка по Wi-Fi».\n3. Нажмите здесь «Сопряжение по коду», затем на ТВ откройте «Отладка по Wi-Fi» → «Подключить устройство с помощью кода».\n4. Отсканируйте QR-код телефоном и введите 6 цифр с экрана ТВ. Окно на ТВ должно оставаться открытым.</string>
-    <string name="open_dev_settings">Открыть настройки разработчика</string>
+    <string name="open_dev_settings">Для разработчиков</string>
     <string name="dev_settings_missing">Раздел «Для разработчиков» скрыт. Сначала откройте его (см. шаг 1).</string>
     <string name="connect">Подключиться</string>
     <string name="pair_by_code">Сопряжение по коду</string>
@@ -135,7 +135,7 @@
     <string name="pairing_required">Этому ТВ нужно сопряжение (отладка по Wi-Fi).</string>
     <string name="no_network">Нет подключения к локальной сети — подключите ТВ к Wi-Fi или Ethernet.</string>
     <string name="connecting_confirm">Подключение… Если появится окно «Разрешить отладку?», отметьте «Всегда разрешать» и нажмите OK.</string>
-    <string name="turbo_connected">✅ Подключено. Glide TV выдал себе нужные права.</string>
+    <string name="turbo_connected">Подключено. Glide TV выдал себе нужные права.</string>
     <string name="connect_unauthorized">Отладка не разрешена. Нажмите «Подключиться» ещё раз и подтвердите окно на экране.</string>
     <string name="connect_failed">Служба отладки недоступна. Проверьте, что отладка включена (шаг 2).</string>
     <string name="root_requesting">Запрос root… подтвердите его в менеджере root.</string>
@@ -175,4 +175,28 @@
     <string name="about_title">Glide TV %1$s</string>
     <string name="about_text">База лишних приложений: %1$d моделей ТВ (CleanYourTV, ревизия %2$s).</string>
     <string name="licenses">Компоненты с открытым кодом: списки CleanYourTV (MIT), libadb-android (Apache-2.0), Bouncy Castle (MIT), ZXing (Apache-2.0), HiddenApiBypass (Apache-2.0), Kotlin coroutines (Apache-2.0).</string>
+
+    <!-- Дизайн v0.2 -->
+    <string name="a11y_checked">отмечено</string>
+    <string name="a11y_unchecked">не отмечено</string>
+    <string name="used">занято</string>
+    <string name="optimizing">Оптимизация…</string>
+    <string name="step_caches_name">очистка кеша</string>
+    <string name="step_ram_name">освобождение RAM</string>
+    <string name="cache_card_title">Кеш приложений</string>
+    <string name="cache_card_text">Временные данные приложений. Сами данные и настройки не пострадают.</string>
+    <string name="junk_card_title">Мусорные файлы</string>
+    <string name="junk_card_text">Старые APK, логи, миниатюры и пустые папки в памяти ТВ.</string>
+    <string name="need_usage_access_short">Размер кеша недоступен без доступа к истории использования.</string>
+    <string name="cache_empty">Кеш приложений пуст — очищать нечего.</string>
+    <string name="junk_list_title">Мусорные файлы</string>
+    <string name="junk_value_clean">Чисто</string>
+    <string name="junk_scan_failed">Не удалось просканировать память: %1$s</string>
+    <string name="deleting">Удаление…</string>
+    <string name="granting_storage">Выдаю Glide TV доступ к памяти…</string>
+    <string name="turbo_how_title">Как включить</string>
+    <string name="pairing_qr">QR-код страницы для ввода кода с телефона</string>
+    <string name="pairing_in_progress">Сопряжение…</string>
+    <string name="apply_disable_n">Отключить %1$d</string>
+    <string name="apply_enable_n">Включить %1$d</string>
 </resources>

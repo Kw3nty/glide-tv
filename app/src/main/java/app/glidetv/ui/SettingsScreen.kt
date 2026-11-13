@@ -12,11 +12,18 @@ import app.glidetv.engine.AnimScale
 import app.glidetv.engine.PackageName
 import app.glidetv.engine.ShellCmd
 import app.glidetv.ui.widgets.Palette
-import app.glidetv.ui.widgets.WRAP
+import app.glidetv.ui.widgets.StatusView
+import app.glidetv.ui.widgets.Type
 import app.glidetv.ui.widgets.actionButton
+import app.glidetv.ui.widgets.addButtons
 import app.glidetv.ui.widgets.addSpaced
 import app.glidetv.ui.widgets.card
+import app.glidetv.ui.widgets.dp
+import app.glidetv.ui.widgets.focusBackground
 import app.glidetv.ui.widgets.horizontal
+import app.glidetv.ui.widgets.iconView
+import app.glidetv.ui.widgets.lp
+import app.glidetv.ui.widgets.onFocusColors
 import app.glidetv.ui.widgets.text
 import app.glidetv.ui.widgets.vertical
 import kotlinx.coroutines.Dispatchers
@@ -25,47 +32,58 @@ import kotlinx.coroutines.withContext
 
 class SettingsScreen(activity: MainActivity) : Screen(activity) {
     private lateinit var firstButton: TextView
-    private lateinit var status: TextView
+    private lateinit var status: StatusView
     private lateinit var aboutText: TextView
 
     override fun createView(): View = ScrollView(ctx).apply {
         addView(ctx.vertical {
-            addSpaced(ctx.text(string(R.string.settings_title), 30f, bold = true), 18)
+            addSpaced(ctx.text(string(R.string.settings_title), Type.TITLE, bold = true), 24)
 
-            section(this, R.string.language) {
-                firstButton = ctx.actionButton(string(R.string.lang_system)) { setLanguage("") }
-                addSpaced(firstButton, 12, LinearLayout.LayoutParams(WRAP, WRAP))
-                addSpaced(ctx.actionButton("Русский") { setLanguage("ru") }, 12, LinearLayout.LayoutParams(WRAP, WRAP))
-                addSpaced(ctx.actionButton("English") { setLanguage("en") }, 0, LinearLayout.LayoutParams(WRAP, WRAP))
+            section(this, R.drawable.ic_globe, R.string.language) {
+                val current = graph.prefs.language
+                firstButton = langButton(string(R.string.lang_system), "", current)
+                addButtons(firstButton, langButton("Русский", "ru", current), langButton("English", "en", current))
             }
 
-            section(this, R.string.animations, R.string.animations_hint) {
-                addSpaced(ctx.actionButton(string(R.string.anim_off)) { setAnim(AnimScale.OFF) }, 12, LinearLayout.LayoutParams(WRAP, WRAP))
-                addSpaced(ctx.actionButton("0.5×") { setAnim(AnimScale.HALF) }, 12, LinearLayout.LayoutParams(WRAP, WRAP))
-                addSpaced(ctx.actionButton("1× (" + string(R.string.default_value) + ")") { setAnim(AnimScale.NORMAL) },
-                    0, LinearLayout.LayoutParams(WRAP, WRAP))
+            section(this, R.drawable.ic_gauge, R.string.animations, R.string.animations_hint) {
+                addButtons(
+                    ctx.actionButton(string(R.string.anim_off)) { setAnim(AnimScale.OFF) },
+                    ctx.actionButton("0.5×") { setAnim(AnimScale.HALF) },
+                    ctx.actionButton("1× (" + string(R.string.default_value) + ")") { setAnim(AnimScale.NORMAL) },
+                )
             }
 
-            section(this, R.string.speedup_apps, R.string.speedup_apps_hint) {
-                addSpaced(ctx.actionButton(string(R.string.speedup_run)) { compileApps(reset = false) }, 12,
-                    LinearLayout.LayoutParams(WRAP, WRAP))
-                addSpaced(ctx.actionButton(string(R.string.speedup_reset)) { compileApps(reset = true) }, 0,
-                    LinearLayout.LayoutParams(WRAP, WRAP))
+            section(this, R.drawable.ic_fast, R.string.speedup_apps, R.string.speedup_apps_hint) {
+                addButtons(
+                    ctx.actionButton(string(R.string.speedup_run), primary = true, iconRes = R.drawable.ic_fast) { compileApps(reset = false) },
+                    ctx.actionButton(string(R.string.speedup_reset), iconRes = R.drawable.ic_restore) { compileApps(reset = true) },
+                )
             }
 
-            section(this, R.string.updates) {
-                addSpaced(ctx.actionButton(string(R.string.check_updates)) { checkUpdates() }, 0,
-                    LinearLayout.LayoutParams(WRAP, WRAP))
+            section(this, R.drawable.ic_download, R.string.updates) {
+                addButtons(ctx.actionButton(string(R.string.check_updates), iconRes = R.drawable.ic_download) { checkUpdates() })
             }
 
-            status = ctx.text("", 15f, Palette.TEXT_DIM).also { addSpaced(it, 18) }
+            status = StatusView(ctx).also { addSpaced(it, 24) }
 
             addSpaced(ctx.card {
-                addView(ctx.text(string(R.string.about_title, BuildConfig.VERSION_NAME), 18f, bold = true))
-                aboutText = ctx.text("", 14f, Palette.TEXT_DIM).also { addView(it) }
-                addView(ctx.text(string(R.string.licenses), 13f, Palette.TEXT_DIM))
+                addSpaced(ctx.text(string(R.string.about_title, BuildConfig.VERSION_NAME), Type.BODY, bold = true), 8)
+                aboutText = ctx.text("", Type.CAPTION, Palette.TEXT_DIM).also { addSpaced(it, 8) }
+                addView(ctx.text(string(R.string.licenses), Type.CAPTION, Palette.TEXT_DIM))
             }, 0)
         })
+    }
+
+    /** Текущий язык отмечен: подложка + циан + галочка (не только цветом). */
+    private fun langButton(label: String, lang: String, current: String): TextView {
+        val selected = lang == current
+        return ctx.actionButton(label, iconRes = if (selected) R.drawable.ic_check else null) { setLanguage(lang) }.apply {
+            isSelected = selected
+            if (selected) {
+                background = focusBackground(ctx, Palette.BG_DEEP)
+                setTextColor(onFocusColors(Palette.ACCENT))
+            }
+        }
     }
 
     override fun defaultFocus(): View = firstButton
@@ -77,10 +95,16 @@ class SettingsScreen(activity: MainActivity) : Screen(activity) {
         }
     }
 
-    private fun section(parent: LinearLayout, title: Int, hint: Int? = null, buttons: LinearLayout.() -> Unit) {
-        parent.addSpaced(ctx.text(string(title), 20f, bold = true), 4)
-        if (hint != null) parent.addSpaced(ctx.text(string(hint), 14f, Palette.TEXT_DIM), 8)
-        parent.addSpaced(ctx.horizontal(buttons), 22)
+    /** Раздел настроек — карточка: иконка + заголовок, пояснение, кнопки. */
+    private fun section(parent: LinearLayout, iconRes: Int, title: Int, hint: Int? = null, buttons: LinearLayout.() -> Unit) {
+        parent.addSpaced(ctx.card {
+            addView(ctx.horizontal {
+                addSpaced(ctx.iconView(iconRes, Palette.ACCENT), 12)
+                addView(ctx.text(string(title), Type.SECTION, bold = true))
+            }, lp().apply { bottomMargin = ctx.dp(if (hint != null) 8 else 16) })
+            if (hint != null) addSpaced(ctx.text(string(hint), Type.SECONDARY, Palette.TEXT_DIM), 16)
+            addView(ctx.horizontal(buttons))
+        }, 16)
     }
 
     private fun setLanguage(lang: String) {
@@ -89,10 +113,10 @@ class SettingsScreen(activity: MainActivity) : Screen(activity) {
     }
 
     private fun setAnim(scale: AnimScale) {
-        val engine = graph.engines.current() ?: run { status.text = string(R.string.need_turbo_short); return }
+        val engine = graph.engines.current() ?: run { status.warn(string(R.string.need_turbo_short)); return }
         scope.launch {
             val ok = engine.run(ShellCmd.SetAnimations(scale)).ok
-            status.text = string(if (ok) R.string.done else R.string.operation_failed)
+            if (ok) status.success(string(R.string.done)) else status.error(string(R.string.operation_failed))
         }
     }
 
@@ -101,8 +125,8 @@ class SettingsScreen(activity: MainActivity) : Screen(activity) {
      * Play Store при обновлении приложения сбрасывает компиляцию — тогда кнопку нужно нажать снова.
      */
     private fun compileApps(reset: Boolean) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) { status.text = string(R.string.speedup_unsupported); return }
-        val engine = graph.engines.current() ?: run { status.text = string(R.string.need_turbo_short); return }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) { status.warn(string(R.string.speedup_unsupported)); return }
+        val engine = graph.engines.current() ?: run { status.warn(string(R.string.need_turbo_short)); return }
         val pm = ctx.packageManager
         val pkgs = graph.apps.installed()
             .filter { it.enabled && it.pkg != ctx.packageName && PackageName.isValid(it.pkg) }
@@ -111,24 +135,24 @@ class SettingsScreen(activity: MainActivity) : Screen(activity) {
         scope.launch {
             var ok = 0
             pkgs.forEachIndexed { i, pkg ->
-                status.text = string(R.string.speedup_progress, i + 1, pkgs.size, pkg)
+                status.progress(string(R.string.speedup_progress, i + 1, pkgs.size, pkg))
                 val cmd = if (reset) ShellCmd.CompileReset(PackageName(pkg)) else ShellCmd.CompileSpeed(PackageName(pkg))
                 if (engine.run(cmd).ok) ok++
             }
-            status.text = string(R.string.speedup_done, ok, pkgs.size)
+            status.success(string(R.string.speedup_done, ok, pkgs.size))
         }
     }
 
     private fun checkUpdates() {
         scope.launch {
-            status.text = string(R.string.checking)
+            status.progress(string(R.string.checking))
             val release = graph.updates.latest()
             graph.prefs.lastUpdateCheck = System.currentTimeMillis()
             when {
-                release == null -> status.text = string(R.string.update_unavailable)
-                !graph.updates.isNewer(release) -> status.text = string(R.string.update_latest, BuildConfig.VERSION_NAME)
+                release == null -> status.warn(string(R.string.update_unavailable))
+                !graph.updates.isNewer(release) -> status.success(string(R.string.update_latest, BuildConfig.VERSION_NAME))
                 else -> {
-                    status.text = ""
+                    status.clear()
                     dialog(string(R.string.update_found, release.version), release.notes.take(1500),
                         positive = R.string.update_install, negative = android.R.string.cancel) { install(release) }
                 }
@@ -139,7 +163,7 @@ class SettingsScreen(activity: MainActivity) : Screen(activity) {
     @Suppress("DEPRECATION")
     private fun install(release: app.glidetv.update.ReleaseInfo) {
         if (!graph.updates.canInstall()) {
-            status.text = string(R.string.update_allow_unknown)
+            status.warn(string(R.string.update_allow_unknown))
             graph.updates.openInstallPermissionSettings()
             return
         }
@@ -158,7 +182,7 @@ class SettingsScreen(activity: MainActivity) : Screen(activity) {
                 graph.updates.install(file)
             } catch (t: Throwable) {
                 progress.dismiss()
-                status.text = string(R.string.update_failed, t.message ?: "")
+                status.error(string(R.string.update_failed, t.message ?: ""))
             }
         }
     }

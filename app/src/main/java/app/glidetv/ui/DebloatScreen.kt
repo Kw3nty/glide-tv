@@ -10,6 +10,8 @@ import app.glidetv.debloat.Risk
 import app.glidetv.ui.widgets.CheckListAdapter
 import app.glidetv.ui.widgets.CheckRow
 import app.glidetv.ui.widgets.Palette
+import app.glidetv.ui.widgets.StatusView
+import app.glidetv.ui.widgets.Type
 import app.glidetv.ui.widgets.WRAP
 import app.glidetv.ui.widgets.actionButton
 import app.glidetv.ui.widgets.addSpaced
@@ -26,7 +28,7 @@ import kotlinx.coroutines.launch
  */
 class DebloatScreen(activity: MainActivity) : Screen(activity) {
     private lateinit var header: TextView
-    private lateinit var status: TextView
+    private lateinit var status: StatusView
     private lateinit var applyButton: TextView
     private lateinit var restoreButton: TextView
     private lateinit var turboButton: TextView
@@ -36,17 +38,17 @@ class DebloatScreen(activity: MainActivity) : Screen(activity) {
     private var busy = false
 
     override fun createView(): View = ctx.vertical {
-        addSpaced(ctx.text(string(R.string.apps_title), 30f, bold = true), 6)
-        header = ctx.text("", 15f, Palette.TEXT_DIM).also { addSpaced(it, 14) }
+        addSpaced(ctx.text(string(R.string.apps_title), Type.TITLE, bold = true), 4)
+        header = ctx.text("", Type.SECONDARY, Palette.TEXT_DIM).also { addSpaced(it, 24) }
         val actions = ctx.horizontal()
-        applyButton = ctx.actionButton(string(R.string.apply_selection), primary = true) { apply() }
+        applyButton = ctx.actionButton(string(R.string.apply_selection), primary = true, iconRes = R.drawable.ic_check) { apply() }
         actions.addSpaced(applyButton, 16, LinearLayout.LayoutParams(WRAP, WRAP))
-        restoreButton = ctx.actionButton(string(R.string.restore_all)) { restoreAll() }
+        restoreButton = ctx.actionButton(string(R.string.restore_all), iconRes = R.drawable.ic_restore) { restoreAll() }
         actions.addSpaced(restoreButton, 16, LinearLayout.LayoutParams(WRAP, WRAP))
-        turboButton = ctx.actionButton(string(R.string.open_turbo)) { activity.show("turbo") }
+        turboButton = ctx.actionButton(string(R.string.open_turbo), primary = true, iconRes = R.drawable.ic_bolt) { activity.show("turbo") }
         actions.addSpaced(turboButton, 0, LinearLayout.LayoutParams(WRAP, WRAP))
-        addSpaced(actions, 10)
-        status = ctx.text("", 15f, Palette.TEXT_DIM).also { addSpaced(it, 10) }
+        addSpaced(actions, 16)
+        status = StatusView(ctx).also { addSpaced(it, 16) }
         addView(ctx.tvListView(adapter), lp(height = 0, weight = 1f))
     }
 
@@ -65,19 +67,22 @@ class DebloatScreen(activity: MainActivity) : Screen(activity) {
             }
             else -> load()
         }
-        if (!privileged) status.text = string(R.string.apps_need_turbo)
+        if (!privileged) status.warn(string(R.string.apps_need_turbo))
     }
 
-    private fun load() {
+    /** [keepStatus] — не затирать итог только что выполненной операции подсказкой. */
+    private fun load(keepStatus: Boolean = false) {
         scope.launch {
-            status.text = string(R.string.loading)
+            if (!keepStatus) status.progress(string(R.string.loading))
             val p = graph.debloatPlanner.plan(graph.debloatJournal)
             plan = p
             candidates = p.candidates.associateBy { it.pkg }
             header.text = p.profile?.let { string(R.string.apps_profile, it.title) }
                 ?: string(R.string.apps_no_profile, graph.debloatDb.profiles.size)
             adapter.rows = p.candidates.map { it.toRow() }
-            if (graph.engines.isPrivileged) status.text = string(R.string.apps_hint)
+            if (!keepStatus) {
+                if (graph.engines.isPrivileged) status.info(string(R.string.apps_hint)) else status.warn(string(R.string.apps_need_turbo))
+            }
             renderButtons()
         }
     }
@@ -122,11 +127,16 @@ class DebloatScreen(activity: MainActivity) : Screen(activity) {
 
     private fun renderButtons() {
         val (dis, en) = changes()
-        applyButton.text = string(R.string.apply_selection_n, dis.size, en.size)
-        applyButton.alpha = if (dis.isEmpty() && en.isEmpty()) 0.5f else 1f
+        applyButton.text = when {
+            dis.isEmpty() && en.isEmpty() -> string(R.string.apply_selection)
+            en.isEmpty() -> string(R.string.apply_disable_n, dis.size)
+            dis.isEmpty() -> string(R.string.apply_enable_n, en.size)
+            else -> string(R.string.apply_selection_n, dis.size, en.size)
+        }
+        applyButton.isEnabled = !busy && (dis.isNotEmpty() || en.isNotEmpty())
         val journaled = graph.debloatJournal.entries().size
         restoreButton.text = string(R.string.restore_all_n, journaled)
-        restoreButton.alpha = if (journaled == 0) 0.5f else 1f
+        restoreButton.isEnabled = !busy && journaled > 0
     }
 
     private fun apply() {
@@ -144,26 +154,28 @@ class DebloatScreen(activity: MainActivity) : Screen(activity) {
         }
         dialog(string(R.string.apply_confirm_title), message, positive = R.string.apply, negative = android.R.string.cancel) {
             busy = true
-            status.text = string(if (toDisable.isNotEmpty()) R.string.progress_disable else R.string.progress_enable,
-                0, if (toDisable.isNotEmpty()) toDisable.size else toEnable.size)
+            status.progress(string(if (toDisable.isNotEmpty()) R.string.progress_disable else R.string.progress_enable,
+                0, if (toDisable.isNotEmpty()) toDisable.size else toEnable.size))
+            renderButtons()
             scope.launch {
                 try {
                     val disabled = graph.debloatExecutor.disable(toDisable) { i, n ->
-                        status.post { status.text = string(R.string.progress_disable, i, n) }
+                        status.post { status.progress(string(R.string.progress_disable, i, n)) }
                     }
                     val enabled = graph.debloatExecutor.enable(toEnable) { i, n ->
-                        status.post { status.text = string(R.string.progress_enable, i, n) }
+                        status.post { status.progress(string(R.string.progress_enable, i, n)) }
                     }
                     val failed = (disabled + enabled).filter { !it.ok }
-                    status.text = string(R.string.apply_done, disabled.count { it.ok }, enabled.count { it.ok }) +
-                        if (failed.isNotEmpty()) " " + string(R.string.apply_failed_n, failed.size) else ""
+                    val summary = string(R.string.apply_done, disabled.count { it.ok }, enabled.count { it.ok })
+                    if (failed.isEmpty()) status.success(summary)
+                    else status.warn(summary + " " + string(R.string.apply_failed_n, failed.size))
                     if (failed.isNotEmpty()) {
                         dialog(string(R.string.apply_failed_title),
                             failed.joinToString("\n") { "• ${candidates[it.pkg]?.label ?: it.pkg}: ${it.message}" })
                     }
                 } finally {
                     busy = false
-                    load()
+                    load(keepStatus = true)
                 }
             }
         }
@@ -174,15 +186,17 @@ class DebloatScreen(activity: MainActivity) : Screen(activity) {
         dialog(string(R.string.restore_confirm_title), string(R.string.restore_confirm_text),
             positive = R.string.restore, negative = android.R.string.cancel) {
             busy = true
+            renderButtons()
+            status.progress(string(R.string.progress_enable, 0, graph.debloatJournal.entries().size))
             scope.launch {
                 try {
                     val r = graph.debloatExecutor.restoreAll { i, n ->
-                        status.post { status.text = string(R.string.progress_enable, i, n) }
+                        status.post { status.progress(string(R.string.progress_enable, i, n)) }
                     }
-                    status.text = string(R.string.restore_done, r.count { it.ok })
+                    status.success(string(R.string.restore_done, r.count { it.ok }))
                 } finally {
                     busy = false
-                    load()
+                    load(keepStatus = true)
                 }
             }
         }
