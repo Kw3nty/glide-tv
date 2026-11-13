@@ -2,6 +2,8 @@ package app.glidetv.ui
 
 import android.app.Activity
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
@@ -16,10 +18,15 @@ import app.glidetv.R
 import app.glidetv.engine.EngineKind
 import app.glidetv.ui.widgets.MATCH
 import app.glidetv.ui.widgets.Palette
+import app.glidetv.ui.widgets.Type
 import app.glidetv.ui.widgets.WRAP
+import app.glidetv.ui.widgets.chip
 import app.glidetv.ui.widgets.dp
 import app.glidetv.ui.widgets.focusBackground
+import app.glidetv.ui.widgets.icon
 import app.glidetv.ui.widgets.lp
+import app.glidetv.ui.widgets.onFocusColors
+import app.glidetv.ui.widgets.setChipColor
 import app.glidetv.ui.widgets.text
 import app.glidetv.ui.widgets.vertical
 import app.glidetv.util.Locales
@@ -54,13 +61,19 @@ class MainActivity : Activity() {
         show("dashboard")
         scope.launch {
             graph.engines.state.collectLatest { st ->
+                val on = st.kind != EngineKind.NONE
                 turboBadge.text = when {
                     st.connecting -> getString(R.string.turbo_connecting)
                     st.kind == EngineKind.ADB -> getString(R.string.turbo_on_adb)
                     st.kind == EngineKind.ROOT -> getString(R.string.turbo_on_root)
                     else -> getString(R.string.turbo_off)
                 }
-                turboBadge.setTextColor(if (st.kind != EngineKind.NONE) Palette.OK else Palette.TEXT_DIM)
+                val color = if (on) Palette.OK else Palette.TEXT_DIM
+                turboBadge.setChipColor(color)
+                turboBadge.setCompoundDrawables(
+                    icon(R.drawable.ic_bolt, ColorStateList.valueOf(color)).apply { setBounds(0, 0, dp(18), dp(18)) },
+                    null, null, null,
+                )
             }
         }
         scope.launch { graph.engines.restore() }
@@ -69,41 +82,48 @@ class MainActivity : Activity() {
     private fun buildLayout(): View {
         content = FrameLayout(this)
         val nav = vertical {
-            setPadding(dp(8), dp(4), dp(24), dp(4))
+            setPadding(0, 0, dp(32), 0)
             addView(ImageView(context).apply {
                 setImageResource(R.drawable.banner)
                 adjustViewBounds = true
-            }, LinearLayout.LayoutParams(dp(180), WRAP).apply { bottomMargin = dp(8) })
-            turboBadge = text("", 14f, Palette.TEXT_DIM).also {
-                addView(it, lp().apply { bottomMargin = dp(20); leftMargin = dp(8) })
+                contentDescription = getString(R.string.app_name)
+            }, LinearLayout.LayoutParams(dp(180), WRAP).apply { bottomMargin = dp(12) })
+            turboBadge = chip().apply { compoundDrawablePadding = dp(6) }.also {
+                addView(it, LinearLayout.LayoutParams(WRAP, WRAP).apply { bottomMargin = dp(28) })
             }
-            addNav(this, R.string.nav_dashboard, "dashboard") { DashboardScreen(this@MainActivity) }
-            addNav(this, R.string.nav_clean, "clean") { CleanScreen(this@MainActivity) }
-            addNav(this, R.string.nav_apps, "apps") { DebloatScreen(this@MainActivity) }
-            addNav(this, R.string.nav_turbo, "turbo") { TurboScreen(this@MainActivity) }
-            addNav(this, R.string.nav_settings, "settings") { SettingsScreen(this@MainActivity) }
+            addNav(this, R.string.nav_dashboard, R.drawable.ic_home, "dashboard") { DashboardScreen(this@MainActivity) }
+            addNav(this, R.string.nav_clean, R.drawable.ic_clean, "clean") { CleanScreen(this@MainActivity) }
+            addNav(this, R.string.nav_apps, R.drawable.ic_apps, "apps") { DebloatScreen(this@MainActivity) }
+            addNav(this, R.string.nav_turbo, R.drawable.ic_bolt, "turbo") { TurboScreen(this@MainActivity) }
+            addNav(this, R.string.nav_settings, R.drawable.ic_settings, "settings") { SettingsScreen(this@MainActivity) }
         }
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Palette.BG)
             // Безопасная зона overscan ~5 % (TV-OV)
-            setPadding(dp(40), dp(27), dp(40), dp(27))
-            addView(nav, LinearLayout.LayoutParams(dp(220), MATCH))
+            setPadding(dp(48), dp(27), dp(48), dp(27))
+            addView(nav, LinearLayout.LayoutParams(dp(240), MATCH))
             addView(content, LinearLayout.LayoutParams(0, MATCH, 1f))
         }
     }
 
-    private fun addNav(parent: LinearLayout, label: Int, key: String, factory: () -> Screen) {
-        val item = text(getString(label), 19f, Palette.TEXT, bold = true).apply {
+    /** Пункт меню: иконка + подпись. Выбранный — подложка и циан, в фокусе — белая заливка. */
+    private fun addNav(parent: LinearLayout, label: Int, iconRes: Int, key: String, factory: () -> Screen) {
+        val colors = onFocusColors(Palette.TEXT, selected = Palette.ACCENT)
+        val item = text(getString(label), Type.BODY, bold = true).apply {
             isFocusable = true
             isClickable = true
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(18), dp(14), dp(18), dp(14))
-            background = focusBackground(context, android.graphics.Color.TRANSPARENT, Palette.CARD_FOCUS, 12)
+            minHeight = dp(56)
+            setPadding(dp(16), dp(12), dp(16), dp(12))
+            setTextColor(colors)
+            background = focusBackground(context, Color.TRANSPARENT, radiusDp = 14)
+            setCompoundDrawables(icon(iconRes, colors).apply { setBounds(0, 0, dp(24), dp(24)) }, null, null, null)
+            compoundDrawablePadding = dp(16)
             setOnClickListener { show(key) }
             tag = key
         }
-        parent.addView(item, lp().apply { bottomMargin = dp(6) })
+        parent.addView(item, lp().apply { bottomMargin = dp(8) })
         navItems += item to factory
     }
 

@@ -1,6 +1,8 @@
 package app.glidetv.ui
 
+import android.content.res.ColorStateList
 import android.graphics.Typeface
+import android.graphics.drawable.StateListDrawable
 import android.text.InputType
 import android.view.View
 import android.widget.EditText
@@ -18,6 +20,12 @@ import app.glidetv.system.AdbRoute
 import app.glidetv.system.SpecialAccess
 import app.glidetv.ui.widgets.Palette
 import app.glidetv.ui.widgets.QrCode
+import app.glidetv.ui.widgets.StatusView
+import app.glidetv.ui.widgets.Type
+import app.glidetv.ui.widgets.chip
+import app.glidetv.ui.widgets.icon
+import app.glidetv.ui.widgets.iconView
+import app.glidetv.ui.widgets.setChipColor
 import app.glidetv.ui.widgets.WRAP
 import app.glidetv.ui.widgets.actionButton
 import app.glidetv.ui.widgets.addSpaced
@@ -43,7 +51,8 @@ import kotlinx.coroutines.withContext
  * Мастер «Турбо»: включение встроенного ADB без компьютера и без сторонних приложений.
  */
 class TurboScreen(activity: MainActivity) : Screen(activity) {
-    private lateinit var state: TextView
+    private lateinit var state: StatusView
+    private lateinit var stateChip: TextView
     private lateinit var steps: TextView
     private lateinit var connectButton: TextView
     private lateinit var pairButton: TextView
@@ -63,66 +72,98 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
 
     override fun createView(): View = ScrollView(ctx).apply {
         addView(ctx.vertical {
-            addSpaced(ctx.text(string(R.string.turbo_title), 30f, bold = true), 6)
-            addSpaced(ctx.text(string(R.string.turbo_subtitle), 15f, Palette.TEXT_DIM), 16)
-            state = ctx.text("", 20f, bold = true).also { addSpaced(it, 12) }
+            addSpaced(ctx.text(string(R.string.turbo_title), Type.TITLE, bold = true), 4)
+            addSpaced(ctx.text(string(R.string.turbo_subtitle), Type.SECONDARY, Palette.TEXT_DIM), 20)
+            stateChip = ctx.chip().apply { compoundDrawablePadding = dp(6) }
+            addSpaced(stateChip, 12, LinearLayout.LayoutParams(WRAP, WRAP))
+            state = StatusView(ctx).also { addSpaced(it, 16) }
 
             addSpaced(ctx.card {
-                steps = ctx.text("", 16f, Palette.TEXT).also { addView(it) }
-            }, 16)
+                addSpaced(ctx.text(string(R.string.turbo_how_title), Type.SECTION, bold = true), 12)
+                steps = ctx.text("", Type.BODY, Palette.TEXT).apply { setLineSpacing(0f, 1.35f) }.also { addView(it) }
+            }, 24)
 
+            // Два ряда: в 600dp контентной области четыре кнопки в одну строку не помещаются
             val actions = ctx.horizontal()
-            actions.addSpaced(ctx.actionButton(string(R.string.open_dev_settings)) {
-                if (!SpecialAccess.openDeveloperSettings(ctx)) state.text = string(R.string.dev_settings_missing)
-            }, 16, LinearLayout.LayoutParams(WRAP, WRAP))
-            connectButton = ctx.actionButton(string(R.string.connect), primary = true) { connect() }
+            connectButton = ctx.actionButton(string(R.string.connect), primary = true, iconRes = R.drawable.ic_link) { connect() }
             actions.addSpaced(connectButton, 16, LinearLayout.LayoutParams(WRAP, WRAP))
-            pairButton = ctx.actionButton(string(R.string.pair_by_code)) { showPairing() }
-            actions.addSpaced(pairButton, 16, LinearLayout.LayoutParams(WRAP, WRAP))
-            rootButton = ctx.actionButton(string(R.string.use_root)) { useRoot() }
-            actions.addSpaced(rootButton, 0, LinearLayout.LayoutParams(WRAP, WRAP))
+            pairButton = ctx.actionButton(string(R.string.pair_by_code), iconRes = R.drawable.ic_phone) { showPairing() }
+            actions.addSpaced(pairButton, 0, LinearLayout.LayoutParams(WRAP, WRAP))
             addSpaced(actions, 16)
+            val more = ctx.horizontal()
+            more.addSpaced(ctx.actionButton(string(R.string.open_dev_settings), iconRes = R.drawable.ic_settings) {
+                if (!SpecialAccess.openDeveloperSettings(ctx)) state.warn(string(R.string.dev_settings_missing))
+            }, 16, LinearLayout.LayoutParams(WRAP, WRAP))
+            rootButton = ctx.actionButton(string(R.string.use_root), iconRes = R.drawable.ic_bolt) { useRoot() }
+            more.addSpaced(rootButton, 0, LinearLayout.LayoutParams(WRAP, WRAP))
+            addSpaced(more, 24)
 
             pairingPanel = ctx.horizontal {
                 visibility = View.GONE
-                qr = ImageView(ctx).also { addView(it, LinearLayout.LayoutParams(dp(220), dp(220)).apply { rightMargin = dp(24) }) }
+                background = rounded(Palette.CARD, dp(20).toFloat())
+                setPadding(dp(24), dp(24), dp(24), dp(24))
+                // QR на белой подложке: телефонные сканеры плохо читают инвертированный код
+                qr = ImageView(ctx).apply {
+                    background = rounded(Palette.FOCUS, dp(12).toFloat())
+                    setPadding(dp(12), dp(12), dp(12), dp(12))
+                    contentDescription = string(R.string.pairing_qr)
+                }.also { addView(it, LinearLayout.LayoutParams(dp(232), dp(232)).apply { rightMargin = dp(32) }) }
                 addView(ctx.vertical {
-                    addSpaced(ctx.text(string(R.string.pairing_phone_title), 20f, bold = true), 8)
-                    addSpaced(ctx.text(string(R.string.pairing_phone_text), 15f, Palette.TEXT_DIM), 8)
-                    pairingUrl = ctx.text("", 15f, Palette.ACCENT).also { addSpaced(it, 8) }
-                    pairingPort = ctx.text("", 15f, Palette.TEXT_DIM).also { addSpaced(it, 16) }
-                    addSpaced(ctx.text(string(R.string.pairing_manual), 14f, Palette.TEXT_DIM), 6)
+                    addSpaced(ctx.text(string(R.string.pairing_phone_title), Type.SECTION, bold = true), 8)
+                    addSpaced(ctx.text(string(R.string.pairing_phone_text), Type.SECONDARY, Palette.TEXT_DIM), 12)
+                    pairingUrl = ctx.text("", Type.SECONDARY, Palette.ACCENT, bold = true).also { addSpaced(it, 8) }
+                    pairingPort = ctx.text("", Type.SECONDARY, Palette.TEXT_DIM).also { addSpaced(it, 20) }
+                    addSpaced(ctx.text(string(R.string.pairing_manual), Type.CAPTION, Palette.TEXT_DIM), 8)
                     val row = ctx.horizontal()
                     codeInput = EditText(ctx).apply {
                         inputType = InputType.TYPE_CLASS_NUMBER
                         hint = "123456"
                         setTextColor(Palette.TEXT)
                         setHintTextColor(Palette.TEXT_DIM)
-                        background = rounded(Palette.BG_DEEP, dp(10).toFloat(), Palette.ACCENT, dp(2))
-                        setPadding(dp(14), dp(10), dp(14), dp(10))
+                        setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, Type.SECTION)
+                        letterSpacing = 0.2f
+                        contentDescription = string(R.string.pairing_manual)
+                        background = StateListDrawable().apply {
+                            addState(intArrayOf(android.R.attr.state_focused),
+                                rounded(Palette.BG_DEEP, dp(12).toFloat(), Palette.FOCUS, dp(3)))
+                            addState(intArrayOf(), rounded(Palette.BG_DEEP, dp(12).toFloat(), Palette.OUTLINE, dp(2)))
+                        }
+                        minHeight = dp(56)
+                        setPadding(dp(16), dp(10), dp(16), dp(10))
                     }
-                    row.addSpaced(codeInput, 12, LinearLayout.LayoutParams(dp(180), WRAP))
-                    row.addSpaced(ctx.actionButton(string(R.string.pair)) {
+                    row.addSpaced(codeInput, 16, LinearLayout.LayoutParams(dp(200), WRAP))
+                    row.addSpaced(ctx.actionButton(string(R.string.pair), iconRes = R.drawable.ic_check) {
                         val code = codeInput.text.toString().trim()
-                        scope.launch { state.text = withContext(Dispatchers.IO) { pairWith(code).message } }
+                        state.progress(string(R.string.pairing_in_progress))
+                        scope.launch {
+                            val r = withContext(Dispatchers.IO) { pairWith(code) }
+                            if (r.success) state.success(r.message) else state.error(r.message)
+                        }
                     }, 0, LinearLayout.LayoutParams(WRAP, WRAP))
                     addView(row)
                 }, lp(0, WRAP, 1f))
             }
-            addSpaced(pairingPanel, 16)
+            addSpaced(pairingPanel, 24)
 
             connectedActions = ctx.horizontal {
-                addSpaced(ctx.actionButton(string(R.string.disable_debugging)) { disableDebugging() }, 16,
+                addSpaced(ctx.actionButton(string(R.string.disable_debugging), iconRes = R.drawable.ic_power) { disableDebugging() }, 16,
                     LinearLayout.LayoutParams(WRAP, WRAP))
-                addSpaced(ctx.actionButton(string(R.string.forget_turbo)) {
+                addSpaced(ctx.actionButton(string(R.string.forget_turbo), iconRes = R.drawable.ic_close) {
                     graph.engines.forget(); render()
                 }, 0, LinearLayout.LayoutParams(WRAP, WRAP))
             }
-            addSpaced(connectedActions, 16)
+            addSpaced(connectedActions, 24)
 
-            addSpaced(ctx.text(string(R.string.log), 14f, Palette.TEXT_DIM, bold = true), 4)
-            log = ctx.text("", 12f, Palette.TEXT_DIM).apply { typeface = Typeface.MONOSPACE }
-            addView(log)
+            // Карточка журнала фокусируемая: иначе пультом до неё не прокрутить
+            addView(ctx.card(focusable = true, paddingDp = 20) {
+                contentDescription = string(R.string.log)
+                addView(ctx.horizontal {
+                    addSpaced(ctx.iconView(R.drawable.ic_terminal, Palette.TEXT_DIM, 20), 10)
+                    addView(ctx.text(string(R.string.log), Type.CAPTION, Palette.TEXT_DIM, bold = true))
+                }, lp().apply { bottomMargin = dp(8) })
+                log = ctx.text("", Type.CAPTION, Palette.TEXT_DIM).apply { typeface = Typeface.MONOSPACE }
+                addView(log)
+            })
         })
     }
 
@@ -133,7 +174,7 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
         scope.launch { graph.engines.state.collect { render() } }
         scope.launch {
             while (isActive) {
-                log.text = Logx.snapshot().takeLast(14).joinToString("\n")
+                log.text = Logx.snapshot().takeLast(12).joinToString("\n")
                 delay(1_000)
             }
         }
@@ -162,12 +203,18 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
     private fun render() {
         val kind = graph.engines.state.value.kind
         val p = graph.platform
-        state.text = when (kind) {
+        stateChip.text = when (kind) {
             EngineKind.ADB -> string(R.string.turbo_state_adb)
             EngineKind.ROOT -> string(R.string.turbo_state_root)
             EngineKind.NONE -> string(R.string.turbo_state_off)
         }
-        state.setTextColor(if (kind == EngineKind.NONE) Palette.WARN else Palette.OK)
+        val color = if (kind == EngineKind.NONE) Palette.WARN else Palette.OK
+        stateChip.setChipColor(color)
+        stateChip.setCompoundDrawables(
+            ctx.icon(if (kind == EngineKind.NONE) R.drawable.ic_alert else R.drawable.ic_check, ColorStateList.valueOf(color))
+                .apply { setBounds(0, 0, ctx.dp(18), ctx.dp(18)) },
+            null, null, null,
+        )
         steps.text = string(
             when (p.preferredAdbRoute) {
                 AdbRoute.FIRE_TV_ADB -> R.string.steps_fire_tv
@@ -190,7 +237,8 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
         busy = true
         scope.launch {
             try {
-                state.text = string(R.string.connecting_confirm)
+                state.progress(string(R.string.connecting_confirm))
+                connectButton.isEnabled = false
                 val adb = graph.engines.adb
                 var result: ConnectResult = adb.connectLoopback(graph.prefs.lastAdbPort.takeIf { it > 0 } ?: 5555)
                 if (result !is ConnectResult.Connected && graph.platform.supportsWirelessDebugging) {
@@ -207,20 +255,21 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
                 when (val r = result) {
                     is ConnectResult.Connected -> {
                         graph.engines.onAdbConnected(r)
-                        state.text = string(R.string.turbo_connected)
+                        state.success(string(R.string.turbo_connected))
                     }
                     ConnectResult.PairingRequired -> {
-                        state.text = string(R.string.pairing_required)
+                        state.warn(string(R.string.pairing_required))
                         showPairing()
                     }
-                    ConnectResult.Unauthorized -> state.text = string(R.string.connect_unauthorized)
+                    ConnectResult.Unauthorized -> state.warn(string(R.string.connect_unauthorized))
                     is ConnectResult.Failed -> {
-                        state.text = string(R.string.connect_failed)
+                        state.error(string(R.string.connect_failed))
                         if (graph.platform.supportsWirelessDebugging) showPairing()
                     }
                 }
             } finally {
                 busy = false
+                connectButton.isEnabled = true
                 render()
             }
         }
@@ -231,7 +280,7 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
         val srv = server ?: PairingServer { code -> runBlocking { pairWith(code) } }.also { server = it }
         val url = srv.start()
         if (url != null) {
-            qr.setImageBitmap(QrCode.bitmap(url, ctx.dp(220)))
+            qr.setImageBitmap(QrCode.bitmap(url, ctx.dp(208)))
             pairingUrl.text = url
         } else {
             pairingUrl.text = string(R.string.no_network)
@@ -274,9 +323,9 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
 
     private fun useRoot() {
         scope.launch {
-            state.text = string(R.string.root_requesting)
+            state.progress(string(R.string.root_requesting))
             val ok = graph.engines.requestRoot()
-            state.text = string(if (ok) R.string.turbo_state_root else R.string.root_denied)
+            if (ok) state.success(string(R.string.turbo_state_root)) else state.error(string(R.string.root_denied))
             render()
         }
     }

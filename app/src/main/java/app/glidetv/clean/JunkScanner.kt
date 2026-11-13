@@ -33,7 +33,8 @@ class JunkScanner(private val context: Context) {
     suspend fun scan(): List<JunkItem> = withContext(Dispatchers.IO) {
         @Suppress("DEPRECATION")
         val root = Environment.getExternalStorageDirectory() ?: return@withContext emptyList()
-        if (!root.canRead()) return@withContext emptyList()
+        // Без доступа к памяти список был бы пустым, и это выглядело бы как «мусора нет»
+        if (!root.canRead()) throw java.io.IOException("no read access to $root")
         val result = mutableListOf<JunkItem>()
         walk(root, depth = 0, out = result)
         externalCaches(root, result)
