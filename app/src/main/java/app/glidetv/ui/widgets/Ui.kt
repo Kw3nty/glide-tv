@@ -162,6 +162,8 @@ fun Context.vertical(paddingDp: Int = 0, block: LinearLayout.() -> Unit = {}): L
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(paddingDp), dp(paddingDp), dp(paddingDp), dp(paddingDp))
+        // Элемент в фокусе увеличивается (scaleOnFocus) — родитель не должен обрезать его края
+        clipChildren = false
         block()
     }
 
@@ -169,6 +171,7 @@ fun Context.horizontal(block: LinearLayout.() -> Unit = {}): LinearLayout =
     LinearLayout(this).apply {
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
+        clipChildren = false
         block()
     }
 
@@ -274,7 +277,15 @@ class StatusView(context: Context) : LinearLayout(context) {
 fun lp(width: Int = ViewGroup.LayoutParams.MATCH_PARENT, height: Int = ViewGroup.LayoutParams.WRAP_CONTENT, weight: Float = 0f) =
     LinearLayout.LayoutParams(width, height, weight)
 
-fun LinearLayout.addSpaced(view: View, marginDp: Int = 16, params: LinearLayout.LayoutParams = lp()): View {
+/**
+ * Добавить с отступом после элемента. Без [params] сохраняются размеры, заданные самому view
+ * (например 24×24 у [iconView]); иначе в горизонтальном ряду — по содержимому, в вертикальном — на всю ширину.
+ * Раньше здесь всегда было MATCH_PARENT: иконка в ряду растягивалась на всю ширину и «съедала» подпись.
+ */
+fun LinearLayout.addSpaced(view: View, marginDp: Int = 16, params: LinearLayout.LayoutParams? = null): View {
+    val params = params
+        ?: (view.layoutParams as? LinearLayout.LayoutParams)
+        ?: if (orientation == LinearLayout.HORIZONTAL) LinearLayout.LayoutParams(WRAP, WRAP) else lp()
     val m = dp(marginDp)
     if (orientation == LinearLayout.VERTICAL) params.bottomMargin = m else params.rightMargin = m
     addView(view, params)

@@ -192,9 +192,7 @@
     <string name="step_caches_name">cache cleanup</string>
     <string name="step_ram_name">freeing RAM</string>
     <string name="cache_card_title">App cache</string>
-    <string name="cache_card_text">Temporary app data. Your data and settings stay intact.</string>
     <string name="junk_card_title">Junk files</string>
-    <string name="junk_card_text">Old APKs, logs, thumbnails and empty folders in TV storage.</string>
     <string name="need_usage_access_short">Cache size is unavailable without usage access.</string>
     <string name="cache_empty">App cache is empty — nothing to clear.</string>
     <string name="junk_list_title">Junk files</string>
@@ -207,4 +205,5 @@
     <string name="pairing_in_progress">Pairing…</string>
     <string name="apply_disable_n">Disable %1$d</string>
     <string name="apply_enable_n">Enable %1$d</string>
+    <string name="clean_hint">Cache is rebuilt automatically; junk is deleted only after you confirm.</string>
 </resources>
