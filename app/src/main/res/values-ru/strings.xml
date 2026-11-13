@@ -184,9 +184,7 @@
     <string name="step_caches_name">очистка кеша</string>
     <string name="step_ram_name">освобождение RAM</string>
     <string name="cache_card_title">Кеш приложений</string>
-    <string name="cache_card_text">Временные данные приложений. Сами данные и настройки не пострадают.</string>
     <string name="junk_card_title">Мусорные файлы</string>
-    <string name="junk_card_text">Старые APK, логи, миниатюры и пустые папки в памяти ТВ.</string>
     <string name="need_usage_access_short">Размер кеша недоступен без доступа к истории использования.</string>
     <string name="cache_empty">Кеш приложений пуст — очищать нечего.</string>
     <string name="junk_list_title">Мусорные файлы</string>
@@ -199,4 +197,5 @@
     <string name="pairing_in_progress">Сопряжение…</string>
     <string name="apply_disable_n">Отключить %1$d</string>
     <string name="apply_enable_n">Включить %1$d</string>
+    <string name="clean_hint">Кеш создаётся заново сам, мусор удаляется только после подтверждения.</string>
 </resources>

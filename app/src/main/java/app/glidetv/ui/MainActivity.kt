@@ -8,9 +8,11 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import app.glidetv.AppGraph
 import app.glidetv.GlideApp
@@ -82,14 +84,14 @@ class MainActivity : Activity() {
     private fun buildLayout(): View {
         content = FrameLayout(this)
         val nav = vertical {
-            setPadding(0, 0, dp(32), 0)
+            setPadding(0, 0, dp(12), 0)
             addView(ImageView(context).apply {
                 setImageResource(R.drawable.banner)
                 adjustViewBounds = true
                 contentDescription = getString(R.string.app_name)
-            }, LinearLayout.LayoutParams(dp(180), WRAP).apply { bottomMargin = dp(12) })
+            }, LinearLayout.LayoutParams(dp(128), WRAP).apply { bottomMargin = dp(8) })
             turboBadge = chip().apply { compoundDrawablePadding = dp(6) }.also {
-                addView(it, LinearLayout.LayoutParams(WRAP, WRAP).apply { bottomMargin = dp(28) })
+                addView(it, LinearLayout.LayoutParams(WRAP, WRAP).apply { bottomMargin = dp(16) })
             }
             addNav(this, R.string.nav_dashboard, R.drawable.ic_home, "dashboard") { DashboardScreen(this@MainActivity) }
             addNav(this, R.string.nav_clean, R.drawable.ic_clean, "clean") { CleanScreen(this@MainActivity) }
@@ -97,12 +99,18 @@ class MainActivity : Activity() {
             addNav(this, R.string.nav_turbo, R.drawable.ic_bolt, "turbo") { TurboScreen(this@MainActivity) }
             addNav(this, R.string.nav_settings, R.drawable.ic_settings, "settings") { SettingsScreen(this@MainActivity) }
         }
+        // Меню в ScrollView: на ТВ с крупным масштабом интерфейса нижние пункты не обрезаются, а прокручиваются
+        val navScroll = ScrollView(this).apply {
+            isVerticalScrollBarEnabled = false
+            isFillViewport = true
+            addView(nav)
+        }
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             setBackgroundColor(Palette.BG)
             // Безопасная зона overscan ~5 % (TV-OV)
             setPadding(dp(48), dp(27), dp(48), dp(27))
-            addView(nav, LinearLayout.LayoutParams(dp(240), MATCH))
+            addView(navScroll, LinearLayout.LayoutParams(dp(240), MATCH))
             addView(content, LinearLayout.LayoutParams(0, MATCH, 1f))
         }
     }
@@ -114,8 +122,8 @@ class MainActivity : Activity() {
             isFocusable = true
             isClickable = true
             gravity = Gravity.CENTER_VERTICAL
-            minHeight = dp(56)
-            setPadding(dp(16), dp(12), dp(16), dp(12))
+            minHeight = dp(52)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
             setTextColor(colors)
             background = focusBackground(context, Color.TRANSPARENT, radiusDp = 14)
             setCompoundDrawables(icon(iconRes, colors).apply { setBounds(0, 0, dp(24), dp(24)) }, null, null, null)
@@ -123,7 +131,7 @@ class MainActivity : Activity() {
             setOnClickListener { show(key) }
             tag = key
         }
-        parent.addView(item, lp().apply { bottomMargin = dp(8) })
+        parent.addView(item, lp().apply { bottomMargin = dp(4) })
         navItems += item to factory
     }
 
@@ -140,6 +148,9 @@ class MainActivity : Activity() {
         navItems.forEach { (v, _) -> v.isSelected = v.tag == key }
         content.removeAllViews()
         (screen.view.parent as? FrameLayout)?.removeView(screen.view)
+        // Поле 12dp вокруг экрана: увеличенная в фокусе кнопка или карточка не обрезается краем
+        screen.view.setPadding(dp(12), dp(8), dp(12), dp(8))
+        (screen.view as? ViewGroup)?.clipToPadding = false
         content.addView(screen.view, FrameLayout.LayoutParams(MATCH, MATCH))
         screen.onShow()
         screen.view.post { screen.defaultFocus()?.requestFocus() }
