@@ -22,8 +22,8 @@ android {
         // Android TV 5.0 / Fire OS 5 — самые старые поддерживаемые приставки
         minSdk = 21
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.1.1"
+        versionCode = 4
+        versionName = "0.2.0"
 
         // Репозиторий GitHub, откуда приходят обновления (owner/name)
         buildConfigField("String", "UPDATE_REPO", "\"${project.findProperty("glide.updateRepo") ?: "OWNER/glide-tv"}\"")
