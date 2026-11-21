@@ -191,6 +191,7 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
                 else -> string(R.string.home_current_other, s.currentLabel)
             })
             if (s.active && !s.glideIsHome) append("\n").append(string(R.string.home_active_not_home))
+            if (s.blockedBy.isNotEmpty()) append("\n").append(string(R.string.home_blocked, s.blockedBy))
             if (s.disabledStockLabel.isNotEmpty()) append("\n").append(string(R.string.home_stock_disabled, s.disabledStockLabel))
         }
 
@@ -265,12 +266,16 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
                         status.warn(string(R.string.home_need_turbo))
                     }
                 }
-                SwitchResult.FAILED -> status.error(string(R.string.home_failed))
+                // apply() ничего не отключает, поэтому BLOCKED не возвращает; ветка нужна для полноты when
+                SwitchResult.BLOCKED, SwitchResult.FAILED -> status.error(string(R.string.home_failed))
             }
             setBusy(false)
             render()
-            // На Android TV так бывает почти всегда: сразу предлагаем второй шаг, а не оставляем искать кнопку
-            if (offerStock && stockRow.visibility == View.VISIBLE) confirmDisableStock()
+            // На Android TV так бывает почти всегда: сразу предлагаем второй шаг, а не оставляем искать кнопку.
+            // Если второй шаг опасен (Home забрал бы мастер настройки Google TV), вместо окна — объяснение.
+            val blockedBy = switcher.status().blockedBy
+            if (offerStock && blockedBy.isNotEmpty()) status.warn(string(R.string.home_blocked, blockedBy))
+            else if (offerStock && stockRow.visibility == View.VISIBLE) confirmDisableStock()
         }
     }
 
@@ -306,6 +311,7 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
         activity.scope.launch {
             when (switcher.disableStock()) {
                 SwitchResult.DONE -> status.success(string(R.string.home_done))
+                SwitchResult.BLOCKED -> status.warn(string(R.string.home_blocked, switcher.status().blockedBy))
                 else -> status.error(string(R.string.home_failed))
             }
             setBusy(false)

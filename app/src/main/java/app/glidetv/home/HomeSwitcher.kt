@@ -24,6 +24,11 @@ data class HomeStatus(
     val disabledStockLabel: String,
     /** Есть стандартный лаунчер, который можно отключить, чтобы Home достался Glide TV. */
     val stockCanBeDisabled: Boolean,
+    /**
+     * Название системного приложения, которое заберёт Home, если отключить стандартный лаунчер
+     * (на Google TV это мастер первой настройки). Пусто — такого нет.
+     */
+    val blockedBy: String,
 )
 
 enum class SwitchResult {
@@ -35,6 +40,11 @@ enum class SwitchResult {
     NEED_PICKER,
     /** Стандартный лаунчер сильнее любого выбора пользователя: нужен «Турбо». Ничего не изменено. */
     NEED_TURBO,
+    /**
+     * Отключать стандартный лаунчер нельзя: Home достался бы не Glide TV, а другому системному приложению
+     * (мастеру настройки Google TV, который на этом месте зацикливает систему). Ничего не изменено.
+     */
+    BLOCKED,
     FAILED,
 }
 
@@ -96,6 +106,27 @@ class HomeSwitcher(
             pkg != null && pkg != app.packageName && !CoreGuard.isCore(pkg) && it.priority > 0
         }
 
+    /**
+     * Системные приложения, которые заберут Home, как только стандартный лаунчер будет отключён: у их фильтра
+     * приоритет выше нуля, а у экрана Glide TV он всегда ноль (Android учитывает приоритет только у приложений
+     * из прошивки). На Google TV это мастер настройки com.google.android.tungsten.setupwraith: его
+     * RecoveryActivity на месте Home зацикливает system_server, а перезагрузка в таком состоянии на части ТВ
+     * кончается сбросом к заводским настройкам (разборы CleanYourTV, TROUBLESHOOTING.md).
+     * set-home-activity при этом отвечает Success и ничего не меняет.
+     */
+    private fun blockers(stock: String?): List<String> =
+        pm.queryIntentActivities(homeIntent(), 0)
+            .filter { it.priority > 0 }
+            .mapNotNull { it.activityInfo?.packageName }
+            .filter { it != app.packageName && it != stock && !CoreGuard.isCore(it) }
+            .distinct()
+
+    /** Все, кто сейчас претендует на Home, с приоритетами — для журнала. */
+    private fun claimants(): String =
+        pm.queryIntentActivities(homeIntent(), 0).joinToString {
+            "${it.activityInfo?.packageName}/${it.activityInfo?.name?.substringAfterLast('.')} p=${it.priority}"
+        }
+
     private fun glideRegistered(): Boolean =
         pm.queryIntentActivities(homeIntent(), 0).any { it.activityInfo?.packageName == app.packageName }
 
@@ -121,12 +152,15 @@ class HomeSwitcher(
         val active = isAliasEnabled()
         val glide = isGlide(now)
         val disabled = config.disabledStock
+        val stock = stockPackage()
+        val blocker = if (active && !glide && disabled.isEmpty() && stock != null) blockers(stock).firstOrNull() else null
         return HomeStatus(
             active = active,
             glideIsHome = glide,
             currentLabel = if (isChooser(now)) "" else label(now!!.packageName),
             disabledStockLabel = if (disabled.isEmpty()) "" else label(disabled),
-            stockCanBeDisabled = active && !glide && disabled.isEmpty() && stockPackage() != null,
+            stockCanBeDisabled = active && !glide && disabled.isEmpty() && stock != null && blocker == null,
+            blockedBy = blocker?.let { label(it) }.orEmpty(),
         )
     }
 
@@ -164,6 +198,12 @@ class HomeSwitcher(
         val pkg = stockPackage() ?: return SwitchResult.FAILED
         if (!isAliasEnabled() || !glideRegistered()) return SwitchResult.FAILED
         if (!PackageName.isValid(pkg) || pkg == app.packageName || CoreGuard.isCore(pkg)) return SwitchResult.FAILED
+        // Проверка до любых изменений: если Home заберёт не Glide TV, лаунчер нельзя отключать даже на секунду
+        val blockers = blockers(pkg)
+        if (blockers.isNotEmpty()) {
+            Logx.w("Главный экран: $pkg не отключаем — Home заберёт ${blockers.joinToString()}. Претенденты: ${claimants()}")
+            return SwitchResult.BLOCKED
+        }
 
         // Запись до команды: даже если процесс умрёт посередине, «Вернуть как было» знает, что включать
         config.disabledStock = pkg
@@ -175,9 +215,11 @@ class HomeSwitcher(
             return SwitchResult.DONE
         }
         // Home не достался Glide TV — возвращаем лаунчер, чтобы ТВ не остался без главного экрана
+        val got = resolved()?.flattenToShortString() ?: "никто"
+        val seen = claimants()
         engine.run(ShellCmd.Enable(PackageName(pkg)))
         if (isEnabled(pkg)) config.disabledStock = ""
-        Logx.w("Главный экран: $pkg отключить не удалось, откат")
+        Logx.w("Главный экран: $pkg отключён, но Home достался $got — откат. Претенденты: $seen")
         return SwitchResult.FAILED
     }
 

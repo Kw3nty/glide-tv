@@ -166,8 +166,9 @@ object HomeApps {
     }
 
     /** Делит приложения на ряд избранного и остальные. Скрытые не попадают никуда. */
-    fun arrange(all: List<HomeApp>, config: HomeConfig, columns: Int): Pair<List<HomeApp>, List<HomeApp>> {
-        val hidden = config.hidden
+    fun arrange(all: List<HomeApp>, config: HomeConfig, columns: Int, self: String): Pair<List<HomeApp>, List<HomeApp>> {
+        // Сам Glide TV скрыть нельзя: его плитка — дорога к настройкам экрана и к «Вернуть как было»
+        val hidden = config.hidden - self
         val visible = all.filter { it.pkg !in hidden }.sortedBy { it.label.lowercase(Locale.ROOT) }
         val chosen = config.favorites
         val favorites = if (chosen.isEmpty()) {
@@ -408,7 +409,7 @@ class HomeActivity : Activity() {
 
         val layout = config.preset.layout
         val columns = config.columns
-        val (dock, rest) = HomeApps.arrange(apps, config, columns)
+        val (dock, rest) = HomeApps.arrange(apps, config, columns, packageName)
         firstPkg = (dock.firstOrNull() ?: rest.firstOrNull())?.pkg
         root.rowLock = layout != HomeLayout.LIST
 
@@ -599,13 +600,14 @@ class HomeActivity : Activity() {
         pills(this)
     }
 
-    /** Две кнопки, которые есть в любой раскладке: открыть Glide TV и настройки ТВ. */
+    /**
+     * Две кнопки, которые есть в любой раскладке: сеть Wi-Fi и настройки ТВ.
+     * Сам Glide TV открывается своей плиткой среди приложений (скрыть её нельзя).
+     */
     private fun pills(parent: LinearLayout) {
-        val glide = pill(getString(R.string.app_name), R.drawable.ic_bolt) {
-            if (preview) leavePreview() else open(Intent(this, MainActivity::class.java))
-        }
-        firstPill = glide
-        parent.addView(glide, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(16) })
+        val wifi = pill(getString(R.string.home_wifi), R.drawable.ic_wifi) { openWifi() }
+        firstPill = wifi
+        parent.addView(wifi, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(16) })
         parent.addView(pill(getString(R.string.home_tv_settings), R.drawable.ic_settings) {
             open(Intent(Settings.ACTION_SETTINGS))
         }, LinearLayout.LayoutParams(WRAP, WRAP))
@@ -802,6 +804,13 @@ class HomeActivity : Activity() {
 
     // ───────────────────────────── Действия ─────────────────────────────
 
+    /** Экран сети: на ТВ это «Сеть и Интернет». Нет такого экрана в прошивке — открываем обычные настройки. */
+    private fun openWifi() {
+        val wifi = Intent(Settings.ACTION_WIFI_SETTINGS)
+        val target = if (wifi.resolveActivity(packageManager) != null) wifi else Intent(Settings.ACTION_SETTINGS)
+        open(target, getString(R.string.home_wifi))
+    }
+
     private fun open(intent: Intent, label: String = "") {
         runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure {
             Toast.makeText(this, getString(R.string.home_cant_open, label), Toast.LENGTH_SHORT).show()
@@ -810,7 +819,7 @@ class HomeActivity : Activity() {
 
     /** Меню приложения (удержание OK или кнопка Menu): избранное, порядок, скрыть, сведения. */
     private fun showMenu(app: HomeApp) {
-        val (dock, _) = HomeApps.arrange(apps, config, config.columns)
+        val (dock, _) = HomeApps.arrange(apps, config, config.columns, packageName)
         // Пока пользователь ничего не выбирал, избранное — это автоматически собранный ряд
         val favorites = config.favorites.filter { it != HomeApps.NONE }.ifEmpty {
             if (config.favorites.isEmpty()) dock.map { it.pkg } else emptyList()
@@ -832,9 +841,11 @@ class HomeActivity : Activity() {
             // В начало ряда: в ряд помещается столько приложений, сколько колонок, и добавленное должно быть видно
             items += getString(R.string.home_menu_fav_add) to { save(listOf(app.pkg) + favorites) }
         }
-        items += getString(R.string.home_menu_hide) to {
-            if (index >= 0) save(favorites - app.pkg)
-            config.hidden = config.hidden + app.pkg
+        if (app.pkg != packageName) {
+            items += getString(R.string.home_menu_hide) to {
+                if (index >= 0) save(favorites - app.pkg)
+                config.hidden = config.hidden + app.pkg
+            }
         }
         items += getString(R.string.home_menu_info) to {
             open(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + app.pkg)), app.label)

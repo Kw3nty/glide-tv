@@ -278,4 +278,6 @@
     <string name="home_menu_up">Move up</string>
     <string name="home_menu_down">Move down</string>
     <string name="home_grid_na">Dimmed settings change nothing in this preset.</string>
+    <string name="home_wifi">Wi-Fi</string>
+    <string name="home_blocked">Glide TV did not turn off the stock screen: on this TV the Home button would then go to “%1$s” (the Google TV setup wizard), and that can lock the TV in a restart loop. Nothing was changed.</string>
 </resources>

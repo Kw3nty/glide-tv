@@ -270,4 +270,6 @@
     <string name="home_menu_up">Сдвинуть вверх</string>
     <string name="home_menu_down">Сдвинуть вниз</string>
     <string name="home_grid_na">Приглушённые настройки в этом пресете ничего не меняют.</string>
+    <string name="home_wifi">Wi-Fi</string>
+    <string name="home_blocked">Glide TV не стал отключать стандартный экран: на этом ТВ кнопка Home тогда досталась бы «%1$s» (мастер настройки Google TV), а это может зациклить перезагрузку ТВ. Ничего не изменено.</string>
 </resources>
