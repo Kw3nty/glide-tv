@@ -45,6 +45,9 @@ import app.glidetv.home.HomeBackground
 import app.glidetv.home.HomeConfig
 import app.glidetv.home.HomeLayout
 import app.glidetv.home.HomeSwitcher
+import app.glidetv.home.Posters
+import app.glidetv.home.WatchItem
+import app.glidetv.home.WatchNext
 import app.glidetv.ui.MainActivity
 import app.glidetv.ui.widgets.MATCH
 import app.glidetv.ui.widgets.Palette
@@ -233,6 +236,7 @@ class HomeActivity : Activity() {
     private val scope = MainScope()
 
     private var apps: List<HomeApp> = emptyList()
+    private var watch: List<WatchItem> = emptyList()
     private var stamp = -1
     private var rendered = false
     private var preview = false
@@ -376,11 +380,16 @@ class HomeActivity : Activity() {
     private fun reload() {
         loadJob?.cancel()
         loadJob = scope.launch {
-            val loaded = withContext(Dispatchers.IO) {
-                runCatching { HomeApps.load(this@HomeActivity) }.getOrDefault(emptyList())
+            val wantWatch = config.preset.layout == HomeLayout.SHELF && config.watchNext
+            val (loaded, rows) = withContext(Dispatchers.IO) {
+                val list = runCatching { HomeApps.load(this@HomeActivity) }.getOrDefault(emptyList())
+                list to (if (wantWatch) WatchNext.read(this@HomeActivity) else emptyList())
             }
-            val same = loaded.map { it.pkg } == apps.map { it.pkg }
+            val allowed = loaded.map { it.pkg }.toSet() - config.hidden
+            val picked = WatchNext.pick(rows, System.currentTimeMillis(), allowed, packageName)
+            val same = loaded.map { it.pkg } == apps.map { it.pkg } && picked == watch
             apps = loaded
+            watch = picked
             if (!same || !rendered || stamp != config.stamp) render()
         }
     }
@@ -538,7 +547,16 @@ class HomeActivity : Activity() {
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     includeFontPadding = false
-                }.also { addView(it, lp().apply { bottomMargin = dp(20) }) }
+                }.also { addView(it, lp().apply { bottomMargin = dp(if (watch.isEmpty()) 20 else 12) }) }
+                if (watch.isNotEmpty()) {
+                    // «Продолжить просмотр»: карточки крупнее баннеров приложений — это главное на экране
+                    val cardWidth = tileWidth(5)
+                    addView(text(getString(R.string.home_watch_title), Type.CAPTION, Palette.TEXT_DIM))
+                    addView(ribbon(watch) { item -> watchCard(item, cardWidth) }, lp().apply {
+                        leftMargin = -side
+                        rightMargin = -side
+                    })
+                }
                 addView(ribbon(all) { app -> bannerTile(app, width, labelled = false) }, lp().apply {
                     leftMargin = -side
                     rightMargin = -side
@@ -630,10 +648,10 @@ class HomeActivity : Activity() {
         }
     }
 
-    private fun row(apps: List<HomeApp>, tile: (HomeApp) -> View): LinearLayout = horizontal {
+    private fun <T> row(items: List<T>, tile: (T) -> View): LinearLayout = horizontal {
         gravity = Gravity.TOP
-        apps.forEachIndexed { i, app ->
-            val view = tile(app)
+        items.forEachIndexed { i, item ->
+            val view = tile(item)
             // Плитка без подписи задаёт свой размер сама; остальные — по содержимому
             val params = view.layoutParams as? LinearLayout.LayoutParams ?: LinearLayout.LayoutParams(WRAP, WRAP)
             if (i > 0) params.leftMargin = gap
@@ -642,8 +660,87 @@ class HomeActivity : Activity() {
     }
 
     /** Лента от края до края экрана, листается вбок. */
-    private fun ribbon(apps: List<HomeApp>, tile: (HomeApp) -> View): View = RowScroll(this, side).apply {
-        addView(row(apps, tile).apply { setPadding(side, dp(12), side, dp(12)) })
+    private fun <T> ribbon(items: List<T>, tile: (T) -> View): View = RowScroll(this, side).apply {
+        addView(row(items, tile).apply { setPadding(side, dp(12), side, dp(12)) })
+    }
+
+    /**
+     * Карточка «Продолжить просмотр»: обложка, полоска просмотренного, рамка фокуса. Пока обложка грузится
+     * (или её нет) — название текстом. Название и серия крупно показываются на полке, когда карточка в фокусе.
+     */
+    private fun watchCard(item: WatchItem, width: Int): View {
+        val height = width * 9 / 16
+        val radius = dp(12).toFloat()
+        val app = apps.firstOrNull { it.pkg == item.pkg }
+        val shelfText = if (item.subtitle.isEmpty()) item.title else "${item.title} · ${item.subtitle}"
+        val art = ImageView(this).apply {
+            background = rounded(Color.argb(36, 255, 255, 255), radius)
+            scaleType = ImageView.ScaleType.CENTER_CROP
+            outlineProvider = roundedOutline(radius)
+            clipToOutline = true
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        val fallback = text(item.title, Type.CAPTION, Palette.TEXT).apply {
+            maxLines = 3
+            ellipsize = TextUtils.TruncateAt.END
+            gravity = Gravity.CENTER
+            setPadding(dp(12), dp(8), dp(12), dp(16))
+        }
+        val card = FrameLayout(this).apply {
+            addView(art, FrameLayout.LayoutParams(MATCH, MATCH))
+            addView(fallback, FrameLayout.LayoutParams(MATCH, MATCH))
+            if (item.progress >= 0f) {
+                // Полоска не только цветом: длина заполненной части и есть доля просмотренного
+                addView(horizontal {
+                    background = rounded(Color.argb(150, 0, 0, 0), dp(2).toFloat())
+                    addView(View(context).apply { background = rounded(Palette.ACCENT, dp(2).toFloat()) },
+                        LinearLayout.LayoutParams(0, MATCH, item.progress.coerceAtLeast(0.02f)))
+                    addView(View(context), LinearLayout.LayoutParams(0, MATCH, 1f - item.progress.coerceAtLeast(0.02f)))
+                }, FrameLayout.LayoutParams(MATCH, dp(4), Gravity.BOTTOM).apply {
+                    leftMargin = dp(10)
+                    rightMargin = dp(10)
+                    bottomMargin = dp(8)
+                })
+            }
+            addView(focusRing(radius), FrameLayout.LayoutParams(MATCH, MATCH))
+            isFocusable = true
+            isClickable = true
+            contentDescription = listOf(shelfText, app?.label.orEmpty()).filter { it.isNotEmpty() }.joinToString(". ")
+            tag = "watch:${item.id}"
+            setOnFocusChangeListener { v, has ->
+                if (has) {
+                    focusPkg = "watch:${item.id}"
+                    showOnShelf(shelfText, app?.color ?: Color.parseColor("#3A4658"))
+                }
+                val s = if (has) 1.08f else 1f
+                v.animate().scaleX(s).scaleY(s).setDuration(150).start()
+            }
+            setOnClickListener { openWatch(item, app) }
+            layoutParams = LinearLayout.LayoutParams(width, height)
+        }
+        val uri = item.poster ?: return card
+        fun show(bitmap: android.graphics.Bitmap) {
+            art.setImageBitmap(bitmap)
+            fallback.visibility = View.GONE
+        }
+        val ready = Posters.cached(uri)
+        if (ready != null) {
+            show(ready)
+        } else {
+            scope.launch {
+                val bitmap = withContext(Dispatchers.IO) { Posters.load(this@HomeActivity, uri, width) }
+                if (bitmap != null) show(bitmap)
+            }
+        }
+        return card
+    }
+
+    /** Открыть то, что приложение просило открыть; не вышло — само приложение. */
+    private fun openWatch(item: WatchItem, app: HomeApp?) {
+        val deep = WatchNext.intentOf(item, packageName)
+        if (deep != null && runCatching { startActivity(deep) }.isSuccess) return
+        if (app != null) open(app.launch, app.label)
+        else Toast.makeText(this, getString(R.string.home_cant_open, item.title), Toast.LENGTH_SHORT).show()
     }
 
     private fun roundedOutline(radius: Float) = object : ViewOutlineProvider() {
@@ -670,7 +767,7 @@ class HomeActivity : Activity() {
         view.setOnFocusChangeListener { v, has ->
             if (has) {
                 focusPkg = app.pkg
-                showOnShelf(app)
+                showOnShelf(app.label, app.color)
             }
             val s = if (has) scale else 1f
             v.animate().scaleX(s).scaleY(s).setDuration(150).start()
@@ -785,12 +882,12 @@ class HomeActivity : Activity() {
         scroll.post { scroll.smoothScrollTo(0, item.top + item.height / 2 - scroll.height / 2) }
     }
 
-    /** «Кино»: показать приложение в фокусе на полке — название и свечение в его цвете. */
-    private fun showOnShelf(app: HomeApp) {
+    /** «Кино»: показать то, что в фокусе, на полке — название и свечение в цвете приложения. */
+    private fun showOnShelf(label: String, color: Int) {
         val title = shelfTitle ?: return
         val glow = shelfGlow ?: return
-        title.text = app.label
-        val target = Color.argb(150, Color.red(app.color), Color.green(app.color), Color.blue(app.color))
+        title.text = label
+        val target = Color.argb(150, Color.red(color), Color.green(color), Color.blue(color))
         glowAnimator?.cancel()
         glowAnimator = ValueAnimator.ofArgb(shelfColor, target).apply {
             duration = 350

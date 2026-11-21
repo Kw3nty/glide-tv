@@ -15,6 +15,7 @@ object TurboSetup {
         val sdk = Build.VERSION.SDK_INT
         val steps = buildList {
             add(ShellCmd.GrantSelf(SelfPermission.WRITE_SECURE_SETTINGS))
+            if (sdk >= Build.VERSION_CODES.O) add(ShellCmd.GrantSelf(SelfPermission.READ_TV_LISTINGS))
             SelfAppOp.entries.filter { sdk >= it.minSdk }.forEach { add(ShellCmd.AllowSelfAppOp(it)) }
             // app-ops пишутся на диск лениво: без этого выданное может пропасть после перезагрузки
             if (sdk >= Build.VERSION_CODES.P) add(ShellCmd.PersistAppOps)

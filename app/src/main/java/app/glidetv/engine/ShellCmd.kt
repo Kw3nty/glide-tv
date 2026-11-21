@@ -47,6 +47,9 @@ data class ComponentRef(val pkg: PackageName, val cls: String) {
 /** Разрешения, которые «Турбо» может выдать самому Glide TV. Только себе и только из этого списка. */
 enum class SelfPermission(val value: String) {
     WRITE_SECURE_SETTINGS("android.permission.WRITE_SECURE_SETTINGS"),
+
+    /** Читать «Продолжить просмотр» других приложений (обычное runtime-разрешение, Android 8+). */
+    READ_TV_LISTINGS("android.permission.READ_TV_LISTINGS"),
 }
 
 /** App-ops, которые «Турбо» включает самому Glide TV. */

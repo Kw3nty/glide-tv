@@ -4,6 +4,7 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -14,6 +15,9 @@ import app.glidetv.home.HomeLayout
 import app.glidetv.home.HomePreset
 import app.glidetv.home.RestoreResult
 import app.glidetv.home.SwitchResult
+import app.glidetv.home.WatchNext
+import app.glidetv.engine.SelfPermission
+import app.glidetv.engine.ShellCmd
 import app.glidetv.ui.home.HomeActivity
 import app.glidetv.ui.widgets.Palette
 import app.glidetv.ui.widgets.StatusView
@@ -53,6 +57,9 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
     private lateinit var clockButton: TextView
     private lateinit var labelsButton: TextView
     private lateinit var gridNote: TextView
+    private lateinit var watchRow: LinearLayout
+    private lateinit var watchButton: TextView
+    private lateinit var watchNote: TextView
     private lateinit var hiddenButton: TextView
     private lateinit var status: StatusView
     private val presetButtons = ArrayList<Pair<HomePreset, TextView>>()
@@ -101,6 +108,14 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
                 addView(ctx.horizontal { addButtons(clockButton, labelsButton) })
                 gridNote = ctx.text(string(R.string.home_grid_na), Type.SECONDARY, Palette.TEXT_DIM)
                 addView(gridNote, lp().apply { topMargin = ctx.dp(16) })
+                // Только для «Кино»; в остальных пресетах ряд скрыт
+                watchButton = ctx.actionButton("") { toggleWatchNext() }
+                watchNote = ctx.text("", Type.SECONDARY, Palette.TEXT_DIM)
+                watchRow = ctx.vertical {
+                    addView(ctx.horizontal { addButtons(watchButton) })
+                    addView(watchNote, lp().apply { topMargin = ctx.dp(8) })
+                }
+                addView(watchRow, lp().apply { topMargin = ctx.dp(16) })
             }
 
             section(this, R.drawable.ic_globe, R.string.home_background) {
@@ -226,10 +241,39 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
         labelsButton.isEnabled = usesLabels
         gridNote.visibility = if (usesColumns && usesLabels) View.GONE else View.VISIBLE
 
+        val usesWatch = layout == HomeLayout.SHELF && WatchNext.supported
+        // Ряд скрывается при смене пресета; фокус в этот момент на кнопке пресета, но на всякий случай уводим
+        if (!usesWatch && watchButton.isFocused) clockButton.requestFocus()
+        watchRow.visibility = if (usesWatch) View.VISIBLE else View.GONE
+        watchButton.text = string(if (config.watchNext) R.string.home_watch_on else R.string.home_watch_off)
+        watchNote.text = string(
+            if (config.watchNext && !WatchNext.hasPermission(ctx)) R.string.home_watch_need_permission
+            else R.string.home_watch_note,
+        )
+
         val hidden = config.hidden.size
         if (hidden == 0 && hiddenButton.isFocused) clockButton.requestFocus()
         hiddenButton.text = string(R.string.home_show_hidden, hidden)
         hiddenButton.visibility = if (hidden > 0) View.VISIBLE else View.GONE
+    }
+
+    /**
+     * Включая строку, сразу добываем разрешение читать её: через «Турбо» Glide TV выдаёт его себе сам,
+     * без «Турбо» — обычное системное окно.
+     */
+    private fun toggleWatchNext() {
+        config.watchNext = !config.watchNext
+        render()
+        if (!config.watchNext || WatchNext.hasPermission(ctx)) return
+        val engine = graph.engines.current()
+        if (engine != null) {
+            activity.scope.launch {
+                engine.run(ShellCmd.GrantSelf(SelfPermission.READ_TV_LISTINGS))
+                render()
+            }
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            activity.requestPermissions(arrayOf(WatchNext.PERMISSION), 0)
+        }
     }
 
     private fun setBusy(busy: Boolean) {

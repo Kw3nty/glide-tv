@@ -99,6 +99,11 @@ class HomeConfig(context: Context) : HomeStore {
         get() = sp.getBoolean(K_CLOCK, true)
         set(v) = change { it.putBoolean(K_CLOCK, v) }
 
+    /** Строка «Продолжить просмотр» в «Кино». Единственное, ради чего главный экран ходит в сеть (обложки). */
+    var watchNext: Boolean
+        get() = sp.getBoolean(K_WATCH, true)
+        set(v) = change { it.putBoolean(K_WATCH, v) }
+
     /** Пакеты в ряду избранного, по порядку. Пусто — ряд собирается автоматически. */
     var favorites: List<String>
         get() = split(sp.getString(K_FAVORITES, ""))
@@ -135,6 +140,7 @@ class HomeConfig(context: Context) : HomeStore {
         private const val K_BACKGROUND = "background"
         private const val K_LABELS = "labels"
         private const val K_CLOCK = "clock"
+        private const val K_WATCH = "watch_next"
         private const val K_FAVORITES = "favorites"
         private const val K_HIDDEN = "hidden"
         private const val K_PREVIOUS = "previous_home"

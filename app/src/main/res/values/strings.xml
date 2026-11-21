@@ -282,4 +282,9 @@
     <string name="home_blocked">Glide TV did not turn off the stock screen: on this TV the Home button would then go to “%1$s”, a system app Glide TV does not know. Nothing was changed.</string>
     <string name="home_wifi_owned">The Wi-Fi network on this TV was saved by the Google TV setup wizard: turn the wizard off and the TV forgets the network. Open Settings → Network &amp; Internet, forget the network, join it again, then try once more. Nothing was changed.</string>
     <string name="home_disable_stock_text_wizard">On this TV the stock home screen has to be turned off together with “%1$s”, the Google TV first-run setup wizard: otherwise the Home button goes to the wizard. Nothing is deleted, and “Put it back” turns both on again.\n\nWhat can change:\n• on some TVs casting from a phone stops working;\n• some firmware turns the wizard back on after a power cut. Glide TV then tries to turn it off again after the TV starts; this needs Turbo left on.\n\nBefore a factory reset and before uninstalling Glide TV, press “Put it back”.</string>
+    <string name="home_watch_title">Continue watching</string>
+    <string name="home_watch_on">Continue watching: on</string>
+    <string name="home_watch_off">Continue watching: off</string>
+    <string name="home_watch_note">A row in Cinema with what apps themselves mark as unfinished. Posters are loaded from the internet. Not every app reports this, so some apps never appear here.</string>
+    <string name="home_watch_need_permission">Glide TV has no permission to read this row yet. Turn on Turbo and Glide TV grants it to itself, or allow it in the system dialog.</string>
 </resources>
