@@ -267,7 +267,7 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
                     }
                 }
                 // apply() ничего не отключает, поэтому BLOCKED не возвращает; ветка нужна для полноты when
-                SwitchResult.BLOCKED, SwitchResult.FAILED -> status.error(string(R.string.home_failed))
+                SwitchResult.BLOCKED, SwitchResult.WIFI_OWNED, SwitchResult.FAILED -> status.error(string(R.string.home_failed))
             }
             setBusy(false)
             render()
@@ -298,11 +298,18 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
         // «Сделать главным экраном», и повторное нажатие OK по инерции не должно ничего отключить.
         val dialog = AlertDialog.Builder(activity, android.R.style.Theme_Material_Dialog_Alert)
             .setTitle(string(R.string.home_disable_stock))
-            .setMessage(string(R.string.home_disable_stock_text))
+            .setMessage(disableStockText())
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.home_disable_stock_confirm) { _, _ -> disableStock() }
             .show()
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.requestFocus()
+    }
+
+    /** На Google TV вместе с лаунчером отключается мастер настройки — об этом и о последствиях говорим заранее. */
+    private fun disableStockText(): String {
+        val wizard = switcher.status().wizardLabel
+        return if (wizard.isEmpty()) string(R.string.home_disable_stock_text)
+        else string(R.string.home_disable_stock_text_wizard, wizard)
     }
 
     private fun disableStock() {
@@ -312,6 +319,7 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
             when (switcher.disableStock()) {
                 SwitchResult.DONE -> status.success(string(R.string.home_done))
                 SwitchResult.BLOCKED -> status.warn(string(R.string.home_blocked, switcher.status().blockedBy))
+                SwitchResult.WIFI_OWNED -> status.warn(string(R.string.home_wifi_owned))
                 else -> status.error(string(R.string.home_failed))
             }
             setBusy(false)

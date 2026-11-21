@@ -10,6 +10,7 @@ import app.glidetv.debloat.DebloatJournal
 import app.glidetv.debloat.DebloatPlanner
 import app.glidetv.engine.EngineManager
 import app.glidetv.home.HomeConfig
+import app.glidetv.home.AndroidHomeDevice
 import app.glidetv.home.HomeSwitcher
 import app.glidetv.system.AppsRepository
 import app.glidetv.system.MemoryRepository
@@ -49,5 +50,5 @@ class AppGraph(context: Context) {
     val updates by lazy { UpdateChecker(app) }
 
     val homeConfig by lazy { HomeConfig(app) }
-    val homeSwitcher by lazy { HomeSwitcher(app, homeConfig, engines) }
+    val homeSwitcher by lazy { HomeSwitcher(AndroidHomeDevice(app, engines), homeConfig) }
 }

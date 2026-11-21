@@ -60,7 +60,7 @@ enum class HomePreset(
  * Настройки главного экрана Glide TV и запись о том, что было до его включения.
  * Хранятся отдельно от остальных настроек: главный экран читает их при каждом показе.
  */
-class HomeConfig(context: Context) {
+class HomeConfig(context: Context) : HomeStore {
     private val sp: SharedPreferences =
         context.applicationContext.getSharedPreferences("glide_home", Context.MODE_PRIVATE)
 
@@ -110,12 +110,15 @@ class HomeConfig(context: Context) {
         set(v) = change { it.putString(K_HIDDEN, v.joinToString(SEP)) }
 
     /** Компонент «пакет/класс», который отвечал на кнопку Home до Glide TV. Пусто — ещё не меняли. */
-    var previousHome: String
+    override var previousHome: String
         get() = sp.getString(K_PREVIOUS, "") ?: ""
         set(v) = sp.edit().putString(K_PREVIOUS, v).apply()
 
-    /** Стандартный лаунчер, который Glide TV отключил сам. Только его «Вернуть как было» включает обратно. */
-    var disabledStock: String
+    /**
+     * Пакеты, которые Glide TV отключил сам ради Home, через запятую: лаунчер, за ним мастер настройки Google TV.
+     * Только их «Вернуть как было» включает обратно.
+     */
+    override var disabledStock: String
         get() = sp.getString(K_DISABLED, "") ?: ""
         set(v) = sp.edit().putString(K_DISABLED, v).apply()
 

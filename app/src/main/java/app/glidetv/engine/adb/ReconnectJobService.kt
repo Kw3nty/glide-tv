@@ -20,6 +20,9 @@ class ReconnectJobService : JobService() {
             val kind = runCatching { GlideApp.graph(this@ReconnectJobService).engines.restore() }
                 .getOrDefault(EngineKind.NONE)
             Logx.i("Переподключение после загрузки: $kind")
+            // Прошивка могла включить мастер настройки Google TV обратно — тогда Home достался бы ему
+            runCatching { GlideApp.graph(this@ReconnectJobService).homeSwitcher.heal() }
+                .onFailure { Logx.w("Главный экран: проверка после загрузки не удалась", it) }
             jobFinished(params, false)
         }
         return true
