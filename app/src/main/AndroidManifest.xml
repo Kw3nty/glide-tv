@@ -63,6 +63,32 @@
             </intent-filter>
         </activity>
 
+        <!-- Главный экран Glide TV. Отдельная задача: кнопка Home не поднимает наверх окно настроек Glide TV -->
+        <activity
+            android:name=".ui.home.HomeActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:stateNotNeeded="true"
+            android:taskAffinity="${applicationId}.home"
+            tools:ignore="DiscouragedApi,LockedOrientationActivity" />
+
+        <!-- Категория HOME висит на псевдониме, выключенном по умолчанию: пока пользователь сам не включит
+             экран в Glide TV, система не считает приложение лаунчером и ничего не спрашивает -->
+        <activity-alias
+            android:name=".home.HomeAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:targetActivity=".ui.home.HomeActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity-alias>
+
         <receiver
             android:name=".engine.adb.BootReceiver"
             android:exported="true">

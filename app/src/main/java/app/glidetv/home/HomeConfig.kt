@@ -1,0 +1,124 @@
+package app.glidetv.home
+
+import android.content.Context
+import android.content.SharedPreferences
+
+/** Как выглядит ряд избранного. */
+enum class DockStyle { BAND, NONE, GLASS }
+
+/** Фон главного экрана. Все фоны рисуются кодом: без картинок в APK, без сети. */
+enum class HomeBackground(val key: String) {
+    NAVY("navy"), BLACK("black"), AURORA("aurora"), SUNSET("sunset"), OCEAN("ocean");
+
+    companion object {
+        fun of(key: String?): HomeBackground? = values().firstOrNull { it.key == key }
+    }
+}
+
+/**
+ * Пресет — набор значений по умолчанию. Выбор пресета сбрасывает колонки, фон и подписи
+ * к значениям пресета; после этого каждое из них можно поменять отдельно.
+ */
+enum class HomePreset(
+    val key: String,
+    val columns: Int,
+    val background: HomeBackground,
+    val dock: DockStyle,
+    val labels: Boolean,
+) {
+    /** Полоса избранного и сетка под ней. */
+    DOCK("dock", 5, HomeBackground.NAVY, DockStyle.BAND, true),
+
+    /** Чистый чёрный для OLED: без полосы и подписей, название только у приложения в фокусе. */
+    OLED("oled", 6, HomeBackground.BLACK, DockStyle.NONE, false),
+
+    /** Полупрозрачная «стеклянная» полоса поверх нарисованного фона. */
+    GLASS("glass", 5, HomeBackground.AURORA, DockStyle.GLASS, true);
+
+    companion object {
+        fun of(key: String?): HomePreset? = values().firstOrNull { it.key == key }
+    }
+}
+
+/**
+ * Настройки главного экрана Glide TV и запись о том, что было до его включения.
+ * Хранятся отдельно от остальных настроек: главный экран читает их при каждом показе.
+ */
+class HomeConfig(context: Context) {
+    private val sp: SharedPreferences =
+        context.applicationContext.getSharedPreferences("glide_home", Context.MODE_PRIVATE)
+
+    /** Растёт при каждом изменении вида: главный экран перерисовывается, только если значение изменилось. */
+    val stamp: Int get() = sp.getInt(K_STAMP, 0)
+
+    private fun change(block: (SharedPreferences.Editor) -> Unit) {
+        val editor = sp.edit()
+        block(editor)
+        editor.putInt(K_STAMP, stamp + 1)
+        editor.apply()
+    }
+
+    val preset: HomePreset get() = HomePreset.of(sp.getString(K_PRESET, null)) ?: HomePreset.DOCK
+
+    /** Выбрать пресет: колонки, фон и подписи возвращаются к его значениям. Избранное не трогаем. */
+    fun applyPreset(preset: HomePreset) = change {
+        it.putString(K_PRESET, preset.key)
+        it.remove(K_COLUMNS).remove(K_BACKGROUND).remove(K_LABELS)
+    }
+
+    var columns: Int
+        get() = sp.getInt(K_COLUMNS, preset.columns).coerceIn(MIN_COLUMNS, MAX_COLUMNS)
+        set(v) = change { it.putInt(K_COLUMNS, v.coerceIn(MIN_COLUMNS, MAX_COLUMNS)) }
+
+    var background: HomeBackground
+        get() = HomeBackground.of(sp.getString(K_BACKGROUND, null)) ?: preset.background
+        set(v) = change { it.putString(K_BACKGROUND, v.key) }
+
+    /** Подписи под всеми приложениями. Если выключено, название видно только у приложения в фокусе. */
+    var labels: Boolean
+        get() = sp.getBoolean(K_LABELS, preset.labels)
+        set(v) = change { it.putBoolean(K_LABELS, v) }
+
+    var clock: Boolean
+        get() = sp.getBoolean(K_CLOCK, true)
+        set(v) = change { it.putBoolean(K_CLOCK, v) }
+
+    /** Пакеты в ряду избранного, по порядку. Пусто — ряд собирается автоматически. */
+    var favorites: List<String>
+        get() = split(sp.getString(K_FAVORITES, ""))
+        set(v) = change { it.putString(K_FAVORITES, v.distinct().joinToString(SEP)) }
+
+    /** Пакеты, скрытые с главного экрана (сами приложения не отключаются). */
+    var hidden: Set<String>
+        get() = split(sp.getString(K_HIDDEN, "")).toSet()
+        set(v) = change { it.putString(K_HIDDEN, v.joinToString(SEP)) }
+
+    /** Компонент «пакет/класс», который отвечал на кнопку Home до Glide TV. Пусто — ещё не меняли. */
+    var previousHome: String
+        get() = sp.getString(K_PREVIOUS, "") ?: ""
+        set(v) = sp.edit().putString(K_PREVIOUS, v).apply()
+
+    /** Стандартный лаунчер, который Glide TV отключил сам. Только его «Вернуть как было» включает обратно. */
+    var disabledStock: String
+        get() = sp.getString(K_DISABLED, "") ?: ""
+        set(v) = sp.edit().putString(K_DISABLED, v).apply()
+
+    private fun split(value: String?): List<String> =
+        value.orEmpty().split(SEP).filter { it.isNotBlank() }
+
+    companion object {
+        const val MIN_COLUMNS = 4
+        const val MAX_COLUMNS = 7
+        private const val SEP = ","
+        private const val K_STAMP = "stamp"
+        private const val K_PRESET = "preset"
+        private const val K_COLUMNS = "columns"
+        private const val K_BACKGROUND = "background"
+        private const val K_LABELS = "labels"
+        private const val K_CLOCK = "clock"
+        private const val K_FAVORITES = "favorites"
+        private const val K_HIDDEN = "hidden"
+        private const val K_PREVIOUS = "previous_home"
+        private const val K_DISABLED = "disabled_stock"
+    }
+}

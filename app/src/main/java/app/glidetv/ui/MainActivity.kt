@@ -136,6 +136,7 @@ class MainActivity : Activity() {
             addNav(this, R.string.nav_dashboard, R.drawable.ic_home, "dashboard") { DashboardScreen(this@MainActivity) }
             addNav(this, R.string.nav_clean, R.drawable.ic_clean, "clean") { CleanScreen(this@MainActivity) }
             addNav(this, R.string.nav_apps, R.drawable.ic_apps, "apps") { DebloatScreen(this@MainActivity) }
+            addNav(this, R.string.nav_home, R.drawable.ic_tv, "home") { HomeScreen(this@MainActivity) }
             addNav(this, R.string.nav_turbo, R.drawable.ic_bolt, "turbo") { TurboScreen(this@MainActivity) }
             addNav(this, R.string.nav_settings, R.drawable.ic_settings, "settings") { SettingsScreen(this@MainActivity) }
         }

@@ -18,6 +18,32 @@ value class PackageName(val value: String) {
     }
 }
 
+/**
+ * Компонент «пакет/класс» для shell. Класс проверяется по грамматике Java-имён, а в команду компонент
+ * подставляется в одинарных кавычках: «$» внутреннего класса оболочка не раскрывает.
+ */
+data class ComponentRef(val pkg: PackageName, val cls: String) {
+    init {
+        require(CLASS.matches(cls)) { "bad class name: $cls" }
+    }
+
+    fun flatten(): String = "$pkg/$cls"
+
+    companion object {
+        private val CLASS = Regex("^[A-Za-z_][A-Za-z0-9_\$]*(\\.[A-Za-z_][A-Za-z0-9_\$]*)*$")
+
+        /** Разбирает «пакет/класс» и «пакет/.Класс»; null, если строка не похожа на компонент. */
+        fun parse(flat: String): ComponentRef? {
+            val slash = flat.indexOf('/')
+            if (slash <= 0) return null
+            val pkg = flat.substring(0, slash)
+            var cls = flat.substring(slash + 1)
+            if (cls.startsWith(".")) cls = pkg + cls
+            return if (PackageName.isValid(pkg) && CLASS.matches(cls)) ComponentRef(PackageName(pkg), cls) else null
+        }
+    }
+}
+
 /** Разрешения, которые «Турбо» может выдать самому Glide TV. Только себе и только из этого списка. */
 enum class SelfPermission(val value: String) {
     WRITE_SECURE_SETTINGS("android.permission.WRITE_SECURE_SETTINGS"),
@@ -114,6 +140,12 @@ sealed interface ShellCmd {
     data object DisableDebugging : ShellCmd {
         override fun render(selfPkg: PackageName) =
             "settings put global adb_wifi_enabled 0; settings put global adb_enabled 0"
+    }
+
+    /** Назначить главный экран (кнопка Home). Команда есть с Android 7. */
+    data class SetHomeActivity(val component: ComponentRef) : ShellCmd {
+        override fun render(selfPkg: PackageName) =
+            "cmd package set-home-activity --user 0 '${component.flatten()}'"
     }
 
     data class Read(val query: Query) : ShellCmd {

@@ -19,7 +19,8 @@ object CoreGuard {
     private val NEVER = setOf(
         // Мастер Google TV: владеет сохранённой при настройке Wi-Fi-сетью — её удалит система
         "com.google.android.tungsten.setupwraith",
-        // Стоковые лаунчеры: своего лаунчера у Glide TV нет
+        // Стоковые лаунчеры: в списке лишнего их нет никогда. Отключает их только HomeSwitcher —
+        // отдельным подтверждённым действием, когда главный экран Glide TV уже работает
         "com.google.android.tvlauncher", "com.google.android.apps.tv.launcherx",
         "com.google.android.leanbacklauncher", "com.amazon.tv.launcher", "com.amazon.firehomestarter",
         // Магазин, сервисы Google, WebView
