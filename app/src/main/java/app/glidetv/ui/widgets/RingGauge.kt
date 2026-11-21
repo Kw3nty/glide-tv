@@ -73,7 +73,7 @@ class RingGauge(context: Context, private val sizeDp: Int = 120) : View(context)
         val cy = side / 2 - (value.descent() + value.ascent()) / 2
         canvas.drawText("$percent%", side / 2, cy - if (caption.isEmpty()) 0f else side * 0.06f, value)
         if (caption.isNotEmpty()) {
-            small.textSize = side * 0.12f
+            small.textSize = side * 0.13f
             canvas.drawText(caption, side / 2, cy + side * 0.13f, small)
         }
     }

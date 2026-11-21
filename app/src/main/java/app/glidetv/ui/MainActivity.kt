@@ -4,15 +4,16 @@ import android.app.Activity
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Outline
 import android.os.Bundle
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import app.glidetv.AppGraph
 import app.glidetv.GlideApp
@@ -20,6 +21,7 @@ import app.glidetv.R
 import app.glidetv.engine.EngineKind
 import app.glidetv.ui.widgets.MATCH
 import app.glidetv.ui.widgets.Palette
+import app.glidetv.ui.widgets.TvScrollView
 import app.glidetv.ui.widgets.Type
 import app.glidetv.ui.widgets.WRAP
 import app.glidetv.ui.widgets.chip
@@ -81,14 +83,52 @@ class MainActivity : Activity() {
         scope.launch { graph.engines.restore() }
     }
 
+    /**
+     * Колонка, из которой фокус не уходит кнопками вверх/вниз. Без этого «вниз» с последней кнопки экрана
+     * перепрыгивает на пункт меню слева, который случайно оказался ниже (и наоборот).
+     * Между меню и экраном фокус переходит только влево/вправо.
+     */
+    private class Column(context: Context) : FrameLayout(context) {
+        override fun focusSearch(focused: View?, direction: Int): View? {
+            val next = super.focusSearch(focused, direction)
+            if (focused == null || next == null || next === focused) return next
+            return when (direction) {
+                View.FOCUS_UP, View.FOCUS_DOWN -> if (contains(next)) next else focused
+                // «Вправо» с последней кнопки ряда не перескакивает на кнопку из другого ряда
+                // (экран при этом ещё и прокручивался бы к ней)
+                View.FOCUS_RIGHT -> if (contains(next) && !sameRow(focused, next)) focused else next
+                else -> next
+            }
+        }
+
+        private fun contains(view: View): Boolean {
+            var v: View? = view
+            while (v != null && v !== this) v = v.parent as? View
+            return v === this
+        }
+
+        private fun sameRow(a: View, b: View): Boolean {
+            val pa = IntArray(2).also { a.getLocationOnScreen(it) }
+            val pb = IntArray(2).also { b.getLocationOnScreen(it) }
+            return pa[1] < pb[1] + b.height && pb[1] < pa[1] + a.height
+        }
+    }
+
     private fun buildLayout(): View {
-        content = FrameLayout(this)
+        content = Column(this)
         val nav = vertical {
             setPadding(0, 0, dp(12), 0)
             addView(ImageView(context).apply {
                 setImageResource(R.drawable.banner)
                 adjustViewBounds = true
                 contentDescription = getString(R.string.app_name)
+                // У баннера свой фон: без скругления он выглядит случайным прямоугольником на фоне меню
+                outlineProvider = object : ViewOutlineProvider() {
+                    override fun getOutline(view: View, outline: Outline) {
+                        outline.setRoundRect(0, 0, view.width, view.height, dp(12).toFloat())
+                    }
+                }
+                clipToOutline = true
             }, LinearLayout.LayoutParams(dp(128), WRAP).apply { bottomMargin = dp(8) })
             turboBadge = chip().apply { compoundDrawablePadding = dp(6) }.also {
                 addView(it, LinearLayout.LayoutParams(WRAP, WRAP).apply { bottomMargin = dp(16) })
@@ -100,8 +140,7 @@ class MainActivity : Activity() {
             addNav(this, R.string.nav_settings, R.drawable.ic_settings, "settings") { SettingsScreen(this@MainActivity) }
         }
         // Меню в ScrollView: на ТВ с крупным масштабом интерфейса нижние пункты не обрезаются, а прокручиваются
-        val navScroll = ScrollView(this).apply {
-            isVerticalScrollBarEnabled = false
+        val navScroll = TvScrollView(this).apply {
             isFillViewport = true
             addView(nav)
         }
@@ -110,7 +149,8 @@ class MainActivity : Activity() {
             setBackgroundColor(Palette.BG)
             // Безопасная зона overscan ~5 % (TV-OV)
             setPadding(dp(48), dp(27), dp(48), dp(27))
-            addView(navScroll, LinearLayout.LayoutParams(dp(240), MATCH))
+            addView(Column(context).apply { addView(navScroll, FrameLayout.LayoutParams(MATCH, MATCH)) },
+                LinearLayout.LayoutParams(dp(240), MATCH))
             addView(content, LinearLayout.LayoutParams(0, MATCH, 1f))
         }
     }
@@ -149,8 +189,15 @@ class MainActivity : Activity() {
         content.removeAllViews()
         (screen.view.parent as? FrameLayout)?.removeView(screen.view)
         // Поле 12dp вокруг экрана: увеличенная в фокусе кнопка или карточка не обрезается краем
-        screen.view.setPadding(dp(12), dp(8), dp(12), dp(8))
-        (screen.view as? ViewGroup)?.clipToPadding = false
+        val view = screen.view
+        if (view is TvScrollView) {
+            view.setContentPadding(dp(12), dp(8), dp(12), dp(8))
+            // Экраны кешируются: без сброса экран открылся бы прокрученным там, где его оставили, без заголовка
+            view.scrollTo(0, 0)
+        } else {
+            view.setPadding(dp(12), dp(8), dp(12), dp(8))
+            (view as? ViewGroup)?.clipToPadding = false
+        }
         content.addView(screen.view, FrameLayout.LayoutParams(MATCH, MATCH))
         screen.onShow()
         screen.view.post { screen.defaultFocus()?.requestFocus() }

@@ -2,7 +2,9 @@ package app.glidetv.ui.widgets
 
 import android.content.Context
 import android.content.res.ColorStateList
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.drawable.StateListDrawable
 import android.text.TextUtils
 import android.view.View
@@ -105,7 +107,44 @@ class CheckListAdapter(private val context: Context, private val onChanged: () -
     }
 }
 
-fun Context.tvListView(adapter: CheckListAdapter): ListView = ListView(this).apply {
+/**
+ * ListView для пульта.
+ *
+ * - Выбранная строка всегда видна целиком. Обычный ListView за одно нажатие прокручивает не больше трети
+ *   своей высоты; строка с примечанием выше этого, и выбранная строка оставалась срезанной снизу.
+ * - Строки обрезаются по границам списка. Родитель списка не обрезает детей (clipChildren = false ради
+ *   увеличения кнопок в фокусе), и без этого прокрученные строки рисовались поверх строки статуса над списком.
+ */
+private class TvListView(context: Context) : ListView(context) {
+    override fun getMaxScrollAmount(): Int = height
+
+    /**
+     * Фокус вернулся в уже прокрученный список (например, с кнопок над ним): ListView выбирает ближайшую
+     * строку, даже если она видна наполовину. Доводим её до полной видимости.
+     */
+    override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        if (!gainFocus) return
+        val position = selectedItemPosition
+        if (position == INVALID_POSITION) return
+        val row = getChildAt(position - firstVisiblePosition) ?: return
+        val visibleHeight = height - listPaddingTop - listPaddingBottom
+        when {
+            row.top < listPaddingTop -> setSelectionFromTop(position, 0)
+            row.bottom > height - listPaddingBottom ->
+                setSelectionFromTop(position, (visibleHeight - row.height).coerceAtLeast(0))
+        }
+    }
+
+    override fun dispatchDraw(canvas: Canvas) {
+        val save = canvas.save()
+        canvas.clipRect(scrollX, scrollY, scrollX + width, scrollY + height)
+        super.dispatchDraw(canvas)
+        canvas.restoreToCount(save)
+    }
+}
+
+fun Context.tvListView(adapter: CheckListAdapter): ListView = TvListView(this).apply {
     this.adapter = adapter
     divider = null
     dividerHeight = dp(8)

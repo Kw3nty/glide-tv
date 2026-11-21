@@ -1,6 +1,7 @@
 package app.glidetv.ui
 
 import android.content.res.ColorStateList
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.StateListDrawable
 import android.text.InputType
@@ -8,7 +9,6 @@ import android.view.View
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import app.glidetv.R
 import app.glidetv.engine.EngineKind
@@ -21,6 +21,7 @@ import app.glidetv.system.SpecialAccess
 import app.glidetv.ui.widgets.Palette
 import app.glidetv.ui.widgets.QrCode
 import app.glidetv.ui.widgets.StatusView
+import app.glidetv.ui.widgets.TvScrollView
 import app.glidetv.ui.widgets.Type
 import app.glidetv.ui.widgets.chip
 import app.glidetv.ui.widgets.icon
@@ -70,18 +71,23 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
     @Volatile private var endpoint: PairingEndpoint? = null
     private var busy = false
 
-    override fun createView(): View = ScrollView(ctx).apply {
+    // Заголовок, шаги и кнопки должны помещаться на первом экране (≈470dp): фокус при открытии стоит
+    // на «Подключиться», и если кнопка ниже сгиба, экран открывается уже прокрученным, без заголовка.
+    // Поэтому метка состояния стоит в строке заголовка, а шаги набраны 16sp.
+    override fun createView(): View = TvScrollView(ctx).apply {
         addView(ctx.vertical {
-            addSpaced(ctx.text(string(R.string.turbo_title), Type.TITLE, bold = true), 4)
-            addSpaced(ctx.text(string(R.string.turbo_subtitle), Type.SECONDARY, Palette.TEXT_DIM), 20)
             stateChip = ctx.chip().apply { compoundDrawablePadding = dp(6) }
-            addSpaced(stateChip, 12, LinearLayout.LayoutParams(WRAP, WRAP))
+            addSpaced(ctx.horizontal {
+                addView(ctx.text(string(R.string.turbo_title), Type.TITLE, bold = true), lp(0, WRAP, 1f))
+                addView(stateChip, LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(16) })
+            }, 4)
+            addSpaced(ctx.text(string(R.string.turbo_subtitle), Type.SECONDARY, Palette.TEXT_DIM), 16)
             state = StatusView(ctx).also { addSpaced(it, 16) }
 
-            addSpaced(ctx.card {
-                addSpaced(ctx.text(string(R.string.turbo_how_title), Type.SECTION, bold = true), 12)
-                steps = ctx.text("", Type.BODY, Palette.TEXT).apply { setLineSpacing(0f, 1.35f) }.also { addView(it) }
-            }, 24)
+            addSpaced(ctx.card(paddingDp = 20) {
+                addSpaced(ctx.text(string(R.string.turbo_how_title), Type.SECTION, bold = true), 8)
+                steps = ctx.text("", Type.SECONDARY, Palette.TEXT).apply { setLineSpacing(0f, 1.3f) }.also { addView(it) }
+            }, 16)
 
             // Два ряда: в 600dp контентной области четыре кнопки в одну строку не помещаются
             val actions = ctx.horizontal()
@@ -107,7 +113,14 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
                     background = rounded(Palette.FOCUS, dp(12).toFloat())
                     setPadding(dp(12), dp(12), dp(12), dp(12))
                     contentDescription = string(R.string.pairing_qr)
-                }.also { addView(it, LinearLayout.LayoutParams(dp(232), dp(232)).apply { rightMargin = dp(32) }) }
+                }.also {
+                    // QR прижат к верху панели (текст справа выше него): тогда код и кнопка «Сопряжение по коду»
+                    // помещаются на экране вместе
+                    addView(it, LinearLayout.LayoutParams(dp(232), dp(232)).apply {
+                        rightMargin = dp(32)
+                        gravity = android.view.Gravity.TOP
+                    })
+                }
                 addView(ctx.vertical {
                     addSpaced(ctx.text(string(R.string.pairing_phone_title), Type.SECTION, bold = true), 8)
                     addSpaced(ctx.text(string(R.string.pairing_phone_text), Type.SECONDARY, Palette.TEXT_DIM), 12)
@@ -121,7 +134,7 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
                         setTextColor(Palette.TEXT)
                         setHintTextColor(Palette.TEXT_DIM)
                         setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, Type.SECTION)
-                        letterSpacing = 0.2f
+                        letterSpacing = 0.08f
                         contentDescription = string(R.string.pairing_manual)
                         background = StateListDrawable().apply {
                             addState(intArrayOf(android.R.attr.state_focused),
@@ -129,10 +142,12 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
                             addState(intArrayOf(), rounded(Palette.BG_DEEP, dp(12).toFloat(), Palette.OUTLINE, dp(2)))
                         }
                         minHeight = dp(56)
-                        setPadding(dp(16), dp(10), dp(16), dp(10))
+                        setPadding(dp(14), dp(10), dp(14), dp(10))
                     }
-                    row.addSpaced(codeInput, 16, LinearLayout.LayoutParams(dp(200), WRAP))
-                    row.addSpaced(ctx.actionButton(string(R.string.pair), iconRes = R.drawable.ic_check) {
+                    // Справа от QR остаётся ≈288dp. Кнопка занимает сколько нужно подписи (без иконки),
+                    // поле — остальное: при фиксированных 200dp у поля «Подключить» сжималась до «По…»
+                    row.addSpaced(codeInput, 16, lp(0, WRAP, 1f))
+                    row.addSpaced(ctx.actionButton(string(R.string.pair)) {
                         val code = codeInput.text.toString().trim()
                         state.progress(string(R.string.pairing_in_progress))
                         scope.launch {
@@ -276,7 +291,15 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
     }
 
     private fun showPairing() {
-        pairingPanel.visibility = View.VISIBLE
+        if (pairingPanel.visibility != View.VISIBLE) {
+            pairingPanel.visibility = View.VISIBLE
+            // Панель появляется под кнопками, за нижним краем экрана: без прокрутки кажется, что кнопка не сработала.
+            // Показываем верхнюю часть с QR-кодом; панель целиком выше экрана, и кнопка в фокусе уехала бы за край
+            pairingPanel.post {
+                val bottom = minOf(pairingPanel.height, qr.bottom + pairingPanel.paddingBottom)
+                pairingPanel.requestRectangleOnScreen(Rect(0, 0, pairingPanel.width, bottom))
+            }
+        }
         val srv = server ?: PairingServer { code -> runBlocking { pairWith(code) } }.also { server = it }
         val url = srv.start()
         if (url != null) {

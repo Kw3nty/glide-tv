@@ -3,18 +3,21 @@ package app.glidetv.ui.widgets
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Color
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.text.TextUtils
 import android.util.TypedValue
+import android.view.FocusFinder
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
+import android.widget.ScrollView
 import android.widget.TextView
 
 /**
@@ -112,7 +115,9 @@ fun Context.text(
     sizeSp: Float = Type.BODY,
     color: Int = Palette.TEXT,
     bold: Boolean = false,
-): TextView = TextView(this).apply {
+): TextView = TextView(this).apply { style(value, sizeSp, color, bold) }
+
+private fun TextView.style(value: CharSequence, sizeSp: Float, color: Int, bold: Boolean) {
     text = value
     setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
     setTextColor(color)
@@ -132,12 +137,44 @@ fun Context.iconView(res: Int, color: Int, sizeDp: Int = 24): ImageView = ImageV
 }
 
 /**
+ * Кнопка, которая в выключенном состоянии сохраняет фокус.
+ *
+ * Начиная с Android 9 система снимает фокус с view, которому сделали setEnabled(false), и отдаёт его
+ * первому элементу окна: пользователь нажимает «Оптимизировать», а фокус оказывается в меню на «Главная».
+ * Поэтому «выключено» здесь — собственное состояние: для системы кнопка остаётся включённой и держит
+ * фокус, а нажатие игнорируется и из состояния для фона/цвета убирается state_enabled.
+ */
+private class ActionButton(context: Context) : TextView(context) {
+    // Именно «выключено», а не «включено»: методы ниже вызываются и из конструктора View, когда поле
+    // ещё не инициализировано и равно false — это должно означать обычное состояние
+    private var inactive = false
+
+    override fun setEnabled(enabled: Boolean) {
+        if (inactive == !enabled) return
+        inactive = !enabled
+        refreshDrawableState()
+    }
+
+    override fun isEnabled(): Boolean = !inactive
+
+    override fun onCreateDrawableState(extraSpace: Int): IntArray {
+        val state = super.onCreateDrawableState(extraSpace)
+        if (!inactive) return state
+        return state.filter { it != android.R.attr.state_enabled }.toIntArray()
+    }
+
+    override fun performClick(): Boolean = if (inactive) false else super.performClick()
+}
+
+/**
  * Кнопка для пульта: минимум 56dp по высоте, иконка + подпись, белая заливка в фокусе.
- * Во время операции кнопку выключаем через [TextView.setEnabled] — фокус остаётся, нажатие игнорируется.
+ * Во время операции кнопку выключаем через [TextView.setEnabled] — фокус остаётся, нажатие игнорируется
+ * (см. [ActionButton]).
  */
 fun Context.actionButton(label: CharSequence, primary: Boolean = false, iconRes: Int? = null,
                          onClick: () -> Unit): TextView =
-    text(label, Type.BODY, bold = true).apply {
+    ActionButton(this).apply {
+        style(label, Type.BODY, Palette.TEXT, bold = true)
         isFocusable = true
         isClickable = true
         gravity = Gravity.CENTER
@@ -162,8 +199,10 @@ fun Context.vertical(paddingDp: Int = 0, block: LinearLayout.() -> Unit = {}): L
     LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(dp(paddingDp), dp(paddingDp), dp(paddingDp), dp(paddingDp))
-        // Элемент в фокусе увеличивается (scaleOnFocus) — родитель не должен обрезать его края
+        // Элемент в фокусе увеличивается (scaleOnFocus) — родитель не должен обрезать его края.
+        // clipToPadding тоже: иначе кнопка у края карточки срезается по её внутреннему отступу
         clipChildren = false
+        clipToPadding = false
         block()
     }
 
@@ -172,6 +211,7 @@ fun Context.horizontal(block: LinearLayout.() -> Unit = {}): LinearLayout =
         orientation = LinearLayout.HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
         clipChildren = false
+        clipToPadding = false
         block()
     }
 
@@ -218,10 +258,166 @@ fun TextView.setChipColor(color: Int) {
     setPadding(dp(10), dp(4), dp(10), dp(4))
 }
 
-/** Заголовок экрана + подзаголовок. */
-fun LinearLayout.screenHeader(title: String, subtitle: String? = null): TextView? {
-    addSpaced(context.text(title, Type.TITLE, bold = true), if (subtitle != null) 4 else 24)
-    return subtitle?.let { addSpaced(context.text(it, Type.SECONDARY, Palette.TEXT_DIM), 24) as TextView }
+/** Заголовок экрана + подзаголовок; [gapDp] — отступ до содержимого. */
+fun LinearLayout.screenHeader(title: String, subtitle: String? = null, gapDp: Int = 24): TextView? {
+    addSpaced(context.text(title, Type.TITLE, bold = true), if (subtitle != null) 4 else gapDp)
+    return subtitle?.let { addSpaced(context.text(it, Type.SECONDARY, Palette.TEXT_DIM), gapDp) as TextView }
+}
+
+/**
+ * Прокрутка экрана для пульта.
+ *
+ * - Не обрезает детей: кнопка или карточка в фокусе увеличивается ([scaleOnFocus]) и рисует рамку
+ *   за своими границами. Обычный ScrollView срезает всё по краям своего единственного ребёнка.
+ * - Показывает раздел целиком: фокус на кнопке внутри карточки прокручивает экран так, чтобы была видна
+ *   вся карточка (заголовок и пояснение), а не только кнопка.
+ * - Листает по разделам: если элемент виден при прокрутке в самое начало — показываем начало (заголовок
+ *   экрана не срезается), иначе верхний край ставится на промежуток между разделами. Текст и карточки
+ *   не режутся сверху посередине. Чтобы это работало и в самом конце, под содержимым добавляется пустое
+ *   место ([tail]): последняя «страница» тоже начинается с границы раздела.
+ * - Если содержимое не помещается, край плавно затухает: видно, что экран листается. Длина затухания
+ *   равна промежутку между разделами (16dp), поэтому сверху в него попадает только пустое место.
+ *
+ * Отступы экрана задаются содержимому ([setContentPadding]), а не самому ScrollView: затухание края
+ * рисуется внутри отступов ScrollView, и при прокрутке над ним оставалась бы полоска незатухшего содержимого.
+ */
+class TvScrollView(context: Context) : ScrollView(context) {
+    private var bottomPadding = 0
+    private var tail = 0
+
+    init {
+        isVerticalScrollBarEnabled = false
+        clipChildren = false
+        isVerticalFadingEdgeEnabled = true
+        setFadingEdgeLength(dp(16))
+    }
+
+    fun setContentPadding(left: Int, top: Int, right: Int, bottom: Int) {
+        bottomPadding = bottom
+        (getChildAt(0) as? ViewGroup)?.let {
+            it.setPadding(left, top, right, bottom + tail)
+            it.clipToPadding = false
+        }
+    }
+
+    /**
+     * Положения прокрутки, в которых верхний край приходится на промежуток перед разделом
+     * (прямым потомком содержимого). Промежуток должен быть не меньше затухания, иначе под него
+     * попал бы предыдущий раздел.
+     */
+    private fun sectionStops(content: ViewGroup): List<Int> {
+        val fade = verticalFadingEdgeLength
+        val stops = ArrayList<Int>(content.childCount)
+        var previousBottom = Int.MIN_VALUE
+        for (i in 0 until content.childCount) {
+            val section = content.getChildAt(i)
+            if (section.visibility != View.VISIBLE) continue
+            if (previousBottom != Int.MIN_VALUE && section.top - previousBottom >= fade) {
+                stops += content.top + section.top - fade
+            }
+            previousBottom = section.bottom
+        }
+        return stops
+    }
+
+    override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
+        super.onLayout(changed, l, t, r, b)
+        val content = getChildAt(0) as? ViewGroup ?: return
+        // Сколько можно прокрутить без добавленного места и где ближайшая граница раздела после этого
+        val maxScroll = content.height - tail - (height - paddingTop - paddingBottom)
+        val wanted = if (maxScroll <= 0) 0
+        else sectionStops(content).firstOrNull { it >= maxScroll }?.let { it - maxScroll } ?: 0
+        if (wanted != tail) {
+            tail = wanted
+            // Менять отступ прямо во время layout нельзя — откладываем
+            post {
+                content.setPadding(content.paddingLeft, content.paddingTop, content.paddingRight, bottomPadding + tail)
+            }
+        }
+    }
+
+    private var exactTarget = false
+
+    /** Экран просит показать область (отчёт, панель сопряжения): показываем именно её, а не весь раздел. */
+    override fun requestChildRectangleOnScreen(child: View, rectangle: Rect, immediate: Boolean): Boolean {
+        exactTarget = true
+        try {
+            return super.requestChildRectangleOnScreen(child, rectangle, immediate)
+        } finally {
+            exactTarget = false
+        }
+    }
+
+    override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect): Int {
+        val content = getChildAt(0) as? ViewGroup ?: return super.computeScrollDeltaToGetChildRectOnScreen(rect)
+        val maxScroll = content.height - (height - paddingTop - paddingBottom)
+        if (maxScroll <= 0) return super.computeScrollDeltaToGetChildRectOnScreen(rect)
+        val fade = verticalFadingEdgeLength
+
+        // Цель — весь раздел с элементом в фокусе, если он помещается на экране.
+        // Для явного запроса (requestRectangleOnScreen) цель — ровно запрошенная область.
+        val target = Rect(rect)
+        if (!exactTarget) for (i in 0 until content.childCount) {
+            val section = content.getChildAt(i)
+            if (section.visibility != View.VISIBLE) continue
+            val top = content.top + section.top
+            val bottom = content.top + section.bottom
+            if (rect.top >= top && rect.bottom <= bottom) {
+                if (bottom - top <= height - 2 * fade) target.set(rect.left, top, rect.right, bottom)
+                break
+            }
+        }
+
+        // Цель видна целиком и не попадает под затухание (в начале и в конце экрана затухания нет)
+        fun shows(scroll: Int): Boolean =
+            target.top >= scroll + (if (scroll > 0) fade else 0) &&
+                target.bottom <= scroll + height - (if (scroll < maxScroll) fade else 0)
+
+        val stops = sectionStops(content).filter { it in 1..maxScroll }
+        // Уже стоим на границе раздела и цель видна — не двигаемся (например, фокус переходит между
+        // кнопками одного ряда, а ниже показан отчёт: он не должен уезжать)
+        if (shows(scrollY) && (scrollY == 0 || scrollY in stops || scrollY == maxScroll)) return 0
+        if (shows(0)) return -scrollY
+        val best = stops.filter { shows(it) }.minByOrNull { Math.abs(it - scrollY) }
+            ?: maxScroll.takeIf { shows(it) }
+        return if (best != null) best - scrollY else super.computeScrollDeltaToGetChildRectOnScreen(target)
+    }
+
+    /**
+     * Обработка «вверх»/«вниз» вместо стандартной. Стандартная прокручивает на полэкрана, если следующая
+     * кнопка далеко или кнопок дальше нет, и останавливается где придётся — посреди текста или карточки.
+     * Здесь фокус всегда переходит на следующую кнопку (экран встаёт по её разделу), а когда кнопок
+     * больше нет, оставшееся содержимое листается от раздела к разделу.
+     */
+    override fun arrowScroll(direction: Int): Boolean {
+        val content = getChildAt(0) as? ViewGroup ?: return super.arrowScroll(direction)
+        val maxScroll = content.height - (height - paddingTop - paddingBottom)
+        if (maxScroll <= 0) return super.arrowScroll(direction)
+        val current = findFocus().takeIf { it !== this }
+        val next = FocusFinder.getInstance().findNextFocus(this, current, direction)
+        if (next != null) {
+            // Прокрутку выполнит requestChildFocus → computeScrollDeltaToGetChildRectOnScreen
+            return next.requestFocus(direction)
+        }
+        val stops = sectionStops(content).filter { it in 1 until maxScroll }
+        val target = if (direction == View.FOCUS_DOWN) stops.firstOrNull { it > scrollY } ?: maxScroll
+        else stops.lastOrNull { it < scrollY } ?: 0
+        if (target == scrollY) return false
+        smoothScrollTo(scrollX, target)
+        if (current != null && current.isFocused) {
+            // Кнопка в фокусе уехала за край — фокус забирает сам экран, чтобы он не был невидимым
+            val r = Rect()
+            current.getDrawingRect(r)
+            offsetDescendantRectToMyCoords(current, r)
+            if (r.bottom <= target || r.top >= target + height) {
+                val focusability = descendantFocusability
+                descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
+                requestFocus()
+                descendantFocusability = focusability
+            }
+        }
+        return true
+    }
 }
 
 /**

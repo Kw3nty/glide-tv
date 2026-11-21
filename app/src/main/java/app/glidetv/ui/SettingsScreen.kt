@@ -4,7 +4,6 @@ import android.app.ProgressDialog
 import android.os.Build
 import android.view.View
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import app.glidetv.BuildConfig
 import app.glidetv.R
@@ -13,6 +12,7 @@ import app.glidetv.engine.PackageName
 import app.glidetv.engine.ShellCmd
 import app.glidetv.ui.widgets.Palette
 import app.glidetv.ui.widgets.StatusView
+import app.glidetv.ui.widgets.TvScrollView
 import app.glidetv.ui.widgets.Type
 import app.glidetv.ui.widgets.actionButton
 import app.glidetv.ui.widgets.addButtons
@@ -35,7 +35,7 @@ class SettingsScreen(activity: MainActivity) : Screen(activity) {
     private lateinit var status: StatusView
     private lateinit var aboutText: TextView
 
-    override fun createView(): View = ScrollView(ctx).apply {
+    override fun createView(): View = TvScrollView(ctx).apply {
         addView(ctx.vertical {
             addSpaced(ctx.text(string(R.string.settings_title), Type.TITLE, bold = true), 24)
 

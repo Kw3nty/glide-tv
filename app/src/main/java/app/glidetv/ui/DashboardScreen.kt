@@ -4,7 +4,6 @@ import android.content.res.ColorStateList
 import android.graphics.Rect
 import android.view.View
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
 import app.glidetv.R
 import app.glidetv.clean.OptimizeReport
@@ -15,6 +14,7 @@ import app.glidetv.ui.widgets.Palette
 import app.glidetv.ui.widgets.RingGauge
 import app.glidetv.ui.widgets.StatusView
 import app.glidetv.ui.widgets.Tone
+import app.glidetv.ui.widgets.TvScrollView
 import app.glidetv.ui.widgets.Type
 import app.glidetv.ui.widgets.WRAP
 import app.glidetv.ui.widgets.actionButton
@@ -56,27 +56,30 @@ class DashboardScreen(activity: MainActivity) : Screen(activity) {
     private lateinit var resultLines: LinearLayout
     private var running = false
 
-    override fun createView(): View = ScrollView(ctx).apply {
+    // Отступы 16dp, а не 24: весь экран (с баннером «Турбо» и примечанием в три строки на русском)
+    // должен помещаться в ≈470dp без прокрутки, иначе при движении фокуса он «прыгает»
+    override fun createView(): View = TvScrollView(ctx).apply {
         isFillViewport = true
         addView(ctx.vertical {
-            screenHeader(string(R.string.dashboard_title), graph.platform.displayName)
+            screenHeader(string(R.string.dashboard_title), graph.platform.displayName, gapDp = 16)
 
+            // Карточки одной высоты (MATCH): подпись в одной может занять две строки, в другой — одну
             val row = ctx.horizontal { gravity = android.view.Gravity.TOP }
             row.addSpaced(metricCard(R.drawable.ic_memory, R.string.ram).also {
                 ramGauge = it.getChildAt(0) as RingGauge
                 ramText = (it.getChildAt(1) as LinearLayout).getChildAt(1) as TextView
-            }, 24, lp(0, WRAP, 1f))
+            }, 16, lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
             row.addSpaced(metricCard(R.drawable.ic_storage, R.string.storage).also {
                 storageGauge = it.getChildAt(0) as RingGauge
                 storageText = (it.getChildAt(1) as LinearLayout).getChildAt(1) as TextView
-            }, 0, lp(0, WRAP, 1f))
-            addSpaced(row, 24)
+            }, 0, lp(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+            addSpaced(row, 16)
 
             // Баннер виден только без «Турбо»: когда оно включено, статус уже показан в меню слева
-            turboCard = ctx.card(focusable = true, paddingDp = 20) {
+            turboCard = ctx.card(focusable = true, paddingDp = 16) {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
-                addSpaced(ctx.iconView(R.drawable.ic_bolt, Palette.WARN, 32), 20)
+                addSpaced(ctx.iconView(R.drawable.ic_bolt, Palette.WARN, 32), 16)
                 addView(ctx.vertical {
                     turboChip = ctx.text("", Type.BODY, Palette.WARN, bold = true).also { addView(it) }
                     turboText = ctx.text("", Type.CAPTION, Palette.TEXT_DIM).apply { maxLines = 2 }.also { addView(it) }
@@ -87,10 +90,10 @@ class DashboardScreen(activity: MainActivity) : Screen(activity) {
                         null)
                     compoundDrawablePadding = dp(4)
                 }
-                addView(turboAction, LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(20) })
+                addView(turboAction, LinearLayout.LayoutParams(WRAP, WRAP).apply { leftMargin = dp(16) })
                 setOnClickListener { activity.show("turbo") }
             }
-            addSpaced(turboCard, 24)
+            addSpaced(turboCard, 16)
 
             optimizeButton = ctx.actionButton(string(R.string.optimize), primary = true, iconRes = R.drawable.ic_clean) { optimize() }
             killToggle = ctx.actionButton("", iconRes = R.drawable.ic_memory) {
@@ -114,12 +117,16 @@ class DashboardScreen(activity: MainActivity) : Screen(activity) {
         })
     }
 
-    /** Карточка метрики: кольцо слева, справа название и «свободно X из Y». */
-    private fun metricCard(iconRes: Int, title: Int): LinearLayout = ctx.card(paddingDp = 20) {
+    /**
+     * Карточка метрики: кольцо слева, справа название и «свободно X из Y».
+     * Кольцо 96dp и отступы 16dp оставляют подписи ≈116dp: «Оперативная» помещается целиком
+     * (при 96dp слово рвалось посередине и заголовок занимал три строки).
+     */
+    private fun metricCard(iconRes: Int, title: Int): LinearLayout = ctx.card(paddingDp = 16) {
         orientation = LinearLayout.HORIZONTAL
         gravity = android.view.Gravity.CENTER_VERTICAL
-        addView(RingGauge(ctx, sizeDp = 104).apply { caption = string(R.string.used) },
-            LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(20) })
+        addView(RingGauge(ctx, sizeDp = 96).apply { caption = string(R.string.used) },
+            LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(16) })
         addView(ctx.vertical {
             addView(ctx.horizontal {
                 addSpaced(ctx.iconView(iconRes, Palette.ACCENT, 20), 8)
