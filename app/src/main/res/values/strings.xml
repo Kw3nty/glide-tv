@@ -262,4 +262,20 @@
     <string name="home_menu_right">Move right</string>
     <string name="home_menu_hide">Hide from the home screen</string>
     <string name="home_menu_info">App info</string>
+    <string name="home_preset_cinema">Cinema</string>
+    <string name="home_preset_zen">Zen</string>
+    <string name="home_preset_metro">Tiles</string>
+    <string name="home_preset_rows">Rows</string>
+    <string name="home_preset_cinema_hint">The focused app named in large type over a glow in its colour, and one ribbon of apps at the bottom. After the CleanYourTV top shelf.</string>
+    <string name="home_preset_zen_hint">Only a clock and a list of app names in large type: no icons, no banners. After the Zen list fork.</string>
+    <string name="home_preset_metro_hint">Flat tiles in each app’s own colour with the name inside. After the Retro Metro theme.</string>
+    <string name="home_preset_rows_hint">Rows with headings that scroll sideways: favourites, apps, games. After the 2014 Leanback Launcher.</string>
+    <string name="home_bg_graphite">Graphite</string>
+    <string name="home_row_favorites">Favourites</string>
+    <string name="home_row_apps">Apps</string>
+    <string name="home_row_games">Games</string>
+    <string name="home_row_settings">Settings</string>
+    <string name="home_menu_up">Move up</string>
+    <string name="home_menu_down">Move down</string>
+    <string name="home_grid_na">Dimmed settings change nothing in this preset.</string>
 </resources>

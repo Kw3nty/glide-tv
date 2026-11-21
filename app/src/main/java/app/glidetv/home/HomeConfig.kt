@@ -3,12 +3,15 @@ package app.glidetv.home
 import android.content.Context
 import android.content.SharedPreferences
 
+/** Раскладка главного экрана: чем пресеты отличаются по-настоящему, а не только цветом. */
+enum class HomeLayout { GRID, SHELF, LIST, TILES, ROWS }
+
 /** Как выглядит ряд избранного. */
 enum class DockStyle { BAND, NONE, GLASS }
 
 /** Фон главного экрана. Все фоны рисуются кодом: без картинок в APK, без сети. */
 enum class HomeBackground(val key: String) {
-    NAVY("navy"), BLACK("black"), AURORA("aurora"), SUNSET("sunset"), OCEAN("ocean");
+    NAVY("navy"), BLACK("black"), GRAPHITE("graphite"), AURORA("aurora"), SUNSET("sunset"), OCEAN("ocean");
 
     companion object {
         fun of(key: String?): HomeBackground? = values().firstOrNull { it.key == key }
@@ -21,19 +24,32 @@ enum class HomeBackground(val key: String) {
  */
 enum class HomePreset(
     val key: String,
+    val layout: HomeLayout,
     val columns: Int,
     val background: HomeBackground,
     val dock: DockStyle,
     val labels: Boolean,
 ) {
     /** Полоса избранного и сетка под ней. */
-    DOCK("dock", 5, HomeBackground.NAVY, DockStyle.BAND, true),
+    DOCK("dock", HomeLayout.GRID, 5, HomeBackground.NAVY, DockStyle.BAND, true),
 
     /** Чистый чёрный для OLED: без полосы и подписей, название только у приложения в фокусе. */
-    OLED("oled", 6, HomeBackground.BLACK, DockStyle.NONE, false),
+    OLED("oled", HomeLayout.GRID, 6, HomeBackground.BLACK, DockStyle.NONE, false),
 
     /** Полупрозрачная «стеклянная» полоса поверх нарисованного фона. */
-    GLASS("glass", 5, HomeBackground.AURORA, DockStyle.GLASS, true);
+    GLASS("glass", HomeLayout.GRID, 5, HomeBackground.AURORA, DockStyle.GLASS, true),
+
+    /** Название приложения крупно, свечение в его цвете, одна лента внизу (верхняя полка CleanYourTV). */
+    CINEMA("cinema", HomeLayout.SHELF, 6, HomeBackground.BLACK, DockStyle.NONE, false),
+
+    /** Только часы и список названий, без иконок (форк Zen list). */
+    ZEN("zen", HomeLayout.LIST, 5, HomeBackground.SUNSET, DockStyle.NONE, false),
+
+    /** Плоские цветные плитки с названием внутри (форк Retro Launchers, тема Retro Metro). */
+    METRO("metro", HomeLayout.TILES, 5, HomeBackground.BLACK, DockStyle.NONE, true),
+
+    /** Горизонтальные ряды с заголовками (форк Retro Launchers, Leanback Launcher 2014 года). */
+    ROWS("rows", HomeLayout.ROWS, 5, HomeBackground.GRAPHITE, DockStyle.NONE, true);
 
     companion object {
         fun of(key: String?): HomePreset? = values().firstOrNull { it.key == key }

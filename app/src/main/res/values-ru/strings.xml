@@ -254,4 +254,20 @@
     <string name="home_menu_right">Сдвинуть вправо</string>
     <string name="home_menu_hide">Скрыть с главного экрана</string>
     <string name="home_menu_info">О приложении</string>
+    <string name="home_preset_cinema">Кино</string>
+    <string name="home_preset_zen">Дзен</string>
+    <string name="home_preset_metro">Плитка</string>
+    <string name="home_preset_rows">Ряды</string>
+    <string name="home_preset_cinema_hint">Название приложения в фокусе крупно, свечение в его цвете и одна лента приложений внизу. По мотивам верхней полки CleanYourTV.</string>
+    <string name="home_preset_zen_hint">Только часы и список названий крупным шрифтом: без иконок и баннеров. По мотивам форка Zen list.</string>
+    <string name="home_preset_metro_hint">Плоские плитки в цвете приложения, название внутри. По мотивам темы Retro Metro.</string>
+    <string name="home_preset_rows_hint">Ряды с заголовками, листаются вбок: избранное, приложения, игры. По мотивам Leanback Launcher 2014 года.</string>
+    <string name="home_bg_graphite">Графит</string>
+    <string name="home_row_favorites">Избранное</string>
+    <string name="home_row_apps">Приложения</string>
+    <string name="home_row_games">Игры</string>
+    <string name="home_row_settings">Настройки</string>
+    <string name="home_menu_up">Сдвинуть вверх</string>
+    <string name="home_menu_down">Сдвинуть вниз</string>
+    <string name="home_grid_na">Приглушённые настройки в этом пресете ничего не меняют.</string>
 </resources>

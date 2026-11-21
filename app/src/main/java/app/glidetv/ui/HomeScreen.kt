@@ -10,6 +10,7 @@ import android.widget.TextView
 import app.glidetv.R
 import app.glidetv.home.HomeBackground
 import app.glidetv.home.HomeConfig
+import app.glidetv.home.HomeLayout
 import app.glidetv.home.HomePreset
 import app.glidetv.home.RestoreResult
 import app.glidetv.home.SwitchResult
@@ -51,6 +52,7 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
     private lateinit var presetHint: TextView
     private lateinit var clockButton: TextView
     private lateinit var labelsButton: TextView
+    private lateinit var gridNote: TextView
     private lateinit var hiddenButton: TextView
     private lateinit var status: StatusView
     private val presetButtons = ArrayList<Pair<HomePreset, TextView>>()
@@ -75,11 +77,14 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
             status = StatusView(ctx).also { addSpaced(it, 16) }
 
             section(this, R.drawable.ic_tv, R.string.home_preset) {
-                addView(ctx.horizontal {
-                    addButtons(*HomePreset.values().map { preset ->
-                        choice(presetName(preset)) { config.applyPreset(preset); render() }.also { presetButtons += preset to it }
-                    }.toTypedArray())
-                })
+                // Семь кнопок в один ряд не помещаются в карточку
+                HomePreset.values().toList().chunked(3).forEachIndexed { i, rowItems ->
+                    addView(ctx.horizontal {
+                        addButtons(*rowItems.map { preset ->
+                            choice(presetName(preset)) { config.applyPreset(preset); render() }.also { presetButtons += preset to it }
+                        }.toTypedArray())
+                    }, lp().apply { if (i > 0) topMargin = ctx.dp(16) })
+                }
                 presetHint = ctx.text("", Type.SECONDARY, Palette.TEXT_DIM)
                 addView(presetHint, lp().apply { topMargin = ctx.dp(16) })
             }
@@ -94,6 +99,8 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
                 clockButton = ctx.actionButton("") { config.clock = !config.clock; render() }
                 labelsButton = ctx.actionButton("") { config.labels = !config.labels; render() }
                 addView(ctx.horizontal { addButtons(clockButton, labelsButton) })
+                gridNote = ctx.text(string(R.string.home_grid_na), Type.SECONDARY, Palette.TEXT_DIM)
+                addView(gridNote, lp().apply { topMargin = ctx.dp(16) })
             }
 
             section(this, R.drawable.ic_globe, R.string.home_background) {
@@ -145,11 +152,26 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
         HomePreset.DOCK -> R.string.home_preset_dock
         HomePreset.OLED -> R.string.home_preset_oled
         HomePreset.GLASS -> R.string.home_preset_glass
+        HomePreset.CINEMA -> R.string.home_preset_cinema
+        HomePreset.ZEN -> R.string.home_preset_zen
+        HomePreset.METRO -> R.string.home_preset_metro
+        HomePreset.ROWS -> R.string.home_preset_rows
+    })
+
+    private fun presetHint(preset: HomePreset) = string(when (preset) {
+        HomePreset.DOCK -> R.string.home_preset_dock_hint
+        HomePreset.OLED -> R.string.home_preset_oled_hint
+        HomePreset.GLASS -> R.string.home_preset_glass_hint
+        HomePreset.CINEMA -> R.string.home_preset_cinema_hint
+        HomePreset.ZEN -> R.string.home_preset_zen_hint
+        HomePreset.METRO -> R.string.home_preset_metro_hint
+        HomePreset.ROWS -> R.string.home_preset_rows_hint
     })
 
     private fun backgroundName(background: HomeBackground) = string(when (background) {
         HomeBackground.NAVY -> R.string.home_bg_navy
         HomeBackground.BLACK -> R.string.home_bg_black
+        HomeBackground.GRAPHITE -> R.string.home_bg_graphite
         HomeBackground.AURORA -> R.string.home_bg_aurora
         HomeBackground.SUNSET -> R.string.home_bg_sunset
         HomeBackground.OCEAN -> R.string.home_bg_ocean
@@ -189,13 +211,19 @@ class HomeScreen(activity: MainActivity) : Screen(activity) {
         presetButtons.forEach { (preset, button) -> button.mark(preset == config.preset) }
         columnButtons.forEach { (n, button) -> button.mark(n == config.columns) }
         backgroundButtons.forEach { (bg, button) -> button.mark(bg == config.background) }
-        presetHint.text = string(when (config.preset) {
-            HomePreset.DOCK -> R.string.home_preset_dock_hint
-            HomePreset.OLED -> R.string.home_preset_oled_hint
-            HomePreset.GLASS -> R.string.home_preset_glass_hint
-        })
+        presetHint.text = presetHint(config.preset)
         clockButton.text = string(if (config.clock) R.string.home_clock_on else R.string.home_clock_off)
         labelsButton.text = string(if (config.labels) R.string.home_labels_on else R.string.home_labels_off)
+
+        // Не во всякой раскладке настройка что-то меняет: в списке нет колонок, а подписи под баннерами
+        // есть только в сетке и рядах. Такие кнопки выключены (контур вместо заливки, см. focusBackground):
+        // не нажимаются, но фокус на них остаётся и виден.
+        val layout = config.preset.layout
+        val usesColumns = layout != HomeLayout.LIST
+        val usesLabels = layout == HomeLayout.GRID || layout == HomeLayout.ROWS
+        columnButtons.forEach { (_, button) -> button.isEnabled = usesColumns }
+        labelsButton.isEnabled = usesLabels
+        gridNote.visibility = if (usesColumns && usesLabels) View.GONE else View.VISIBLE
 
         val hidden = config.hidden.size
         if (hidden == 0 && hiddenButton.isFocused) clockButton.requestFocus()

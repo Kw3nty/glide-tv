@@ -1,5 +1,6 @@
 package app.glidetv.ui.home
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
@@ -8,9 +9,13 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Outline
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
@@ -27,8 +32,10 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewOutlineProvider
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import app.glidetv.GlideApp
@@ -36,6 +43,7 @@ import app.glidetv.R
 import app.glidetv.home.DockStyle
 import app.glidetv.home.HomeBackground
 import app.glidetv.home.HomeConfig
+import app.glidetv.home.HomeLayout
 import app.glidetv.home.HomeSwitcher
 import app.glidetv.ui.MainActivity
 import app.glidetv.ui.widgets.MATCH
@@ -65,14 +73,20 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Приложение на главном экране: баннер для ТВ, а если его нет — обычная иконка. */
+/** Приложение на главном экране: баннер для ТВ, обычная иконка и цвет, взятый из них. */
 class HomeApp(
     val pkg: String,
     val label: String,
     val launch: Intent,
     val banner: Drawable?,
     val icon: Drawable?,
-)
+    /** Приглушённый цвет приложения: плитки «Плитки» и свечение «Кино». Белый текст на нём читается. */
+    val color: Int,
+    val isGame: Boolean,
+) {
+    /** Картинка для плитки-баннера 16:9. */
+    val art: Drawable? get() = banner ?: icon
+}
 
 object HomeApps {
     /** Запись в избранном «пользователь сам убрал всё»: ряд не собирается автоматически заново. */
@@ -98,15 +112,60 @@ object HomeApps {
                     .setComponent(ComponentName(activity.packageName, activity.name))
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                 val banner = runCatching { activity.loadBanner(pm) }.getOrNull()
-                val icon = if (banner == null) runCatching { info.loadIcon(pm) }.getOrNull() else null
+                val icon = runCatching { info.loadIcon(pm) }.getOrNull()
                 val label = runCatching { info.loadLabel(pm).toString() }.getOrDefault(activity.packageName)
-                out[activity.packageName] = HomeApp(activity.packageName, label, launch, banner, icon)
+                val color = runCatching { tint(icon ?: banner) }.getOrDefault(NEUTRAL)
+                out[activity.packageName] = HomeApp(activity.packageName, label, launch, banner, icon, color, isGame(activity.applicationInfo))
             }
         }
         return out.values.toList()
     }
 
-    /** Делит приложения на ряд избранного и сетку. Скрытые не попадают никуда. */
+    @Suppress("DEPRECATION")
+    private fun isGame(info: ApplicationInfo?): Boolean {
+        if (info == null) return false
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && info.category == ApplicationInfo.CATEGORY_GAME) return true
+        return info.flags and ApplicationInfo.FLAG_IS_GAME != 0
+    }
+
+    private val NEUTRAL = Color.parseColor("#3A4658")
+
+    /**
+     * Средний цвет картинки, приведённый к виду «фон под белый текст»: насыщенность и яркость в рамках.
+     * Рисуем копию: у оригинала границы уже выставлены тем ImageView, в котором он показан.
+     */
+    private fun tint(drawable: Drawable?): Int {
+        val copy = drawable?.constantState?.newDrawable()?.mutate() ?: return NEUTRAL
+        val size = 24
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        copy.setBounds(0, 0, size, size)
+        copy.draw(Canvas(bitmap))
+        val pixels = IntArray(size * size)
+        bitmap.getPixels(pixels, 0, size, 0, 0, size, size)
+        bitmap.recycle()
+        var r = 0L
+        var g = 0L
+        var b = 0L
+        var n = 0L
+        for (p in pixels) {
+            if (Color.alpha(p) < 128) continue
+            r += Color.red(p)
+            g += Color.green(p)
+            b += Color.blue(p)
+            n++
+        }
+        if (n == 0L) return NEUTRAL
+        val hsv = FloatArray(3)
+        Color.RGBToHSV((r / n).toInt(), (g / n).toInt(), (b / n).toInt(), hsv)
+        // Серые и белые иконки («Настройки») цвета не дают
+        if (hsv[1] < 0.12f) return NEUTRAL
+        hsv[1] = hsv[1].coerceIn(0.45f, 0.85f)
+        // Потолок яркости: даже на жёлтом и голубом белый текст держит контраст около 4.5:1
+        hsv[2] = hsv[2].coerceIn(0.32f, 0.5f)
+        return Color.HSVToColor(hsv)
+    }
+
+    /** Делит приложения на ряд избранного и остальные. Скрытые не попадают никуда. */
     fun arrange(all: List<HomeApp>, config: HomeConfig, columns: Int): Pair<List<HomeApp>, List<HomeApp>> {
         val hidden = config.hidden
         val visible = all.filter { it.pkg !in hidden }.sortedBy { it.label.lowercase(Locale.ROOT) }
@@ -131,20 +190,21 @@ object HomeBackgrounds {
         return when (background) {
             HomeBackground.NAVY -> ColorDrawable(Palette.BG)
             HomeBackground.BLACK -> ColorDrawable(Color.BLACK)
+            HomeBackground.GRAPHITE -> linear(GradientDrawable.Orientation.TOP_BOTTOM, "#232832", "#12151B", "#0B0D11")
             HomeBackground.AURORA -> LayerDrawable(arrayOf(
                 ColorDrawable(Color.parseColor("#070A14")),
-                glow("#5500E5A0", 0.18f, 0.2f, width * 0.55f),
-                glow("#554B6BFF", 0.82f, 0.15f, width * 0.5f),
-                glow("#44B14BFF", 0.6f, 0.95f, width * 0.5f),
+                glow(Color.parseColor("#5500E5A0"), 0.18f, 0.2f, width * 0.55f),
+                glow(Color.parseColor("#554B6BFF"), 0.82f, 0.15f, width * 0.5f),
+                glow(Color.parseColor("#44B14BFF"), 0.6f, 0.95f, width * 0.5f),
             ))
             HomeBackground.SUNSET -> linear(GradientDrawable.Orientation.TOP_BOTTOM, "#120A26", "#3E163C", "#8A3329")
             HomeBackground.OCEAN -> linear(GradientDrawable.Orientation.TL_BR, "#03101C", "#062B44", "#0A5A62")
         }
     }
 
-    private fun glow(color: String, x: Float, y: Float, radius: Float) = GradientDrawable().apply {
+    fun glow(color: Int, x: Float, y: Float, radius: Float) = GradientDrawable().apply {
         gradientType = GradientDrawable.RADIAL_GRADIENT
-        colors = intArrayOf(Color.parseColor(color), Color.TRANSPARENT)
+        colors = intArrayOf(color, Color.TRANSPARENT)
         setGradientCenter(x, y)
         gradientRadius = radius
     }
@@ -154,11 +214,17 @@ object HomeBackgrounds {
 }
 
 /**
- * Главный экран ТВ от Glide TV: часы, ряд избранного и сетка остальных приложений.
- * Без сети, фоновых служб и рекомендаций. Вид задаётся [HomeConfig] (пресет + свои настройки).
+ * Главный экран ТВ от Glide TV. Без сети, фоновых служб и рекомендаций.
+ * Раскладку задаёт пресет ([HomeLayout]), остальное — [HomeConfig]:
+ *
+ * - GRID — часы, полоса избранного и сетка («Док», «Чёрный OLED», «Стекло»);
+ * - SHELF — название приложения крупно, свечение в его цвете и одна лента внизу («Кино»);
+ * - LIST — часы и список названий без иконок («Дзен»);
+ * - TILES — плоские цветные плитки с названием внутри («Плитка»);
+ * - ROWS — горизонтальные ряды с заголовками («Ряды»).
  *
  * Открывается двумя способами: как Home (через псевдоним в манифесте) и как предпросмотр из Glide TV.
- * В предпросмотре «Назад» закрывает экран, в режиме Home — возвращает фокус в начало.
+ * В предпросмотре «Назад» возвращает в Glide TV, в режиме Home — переводит фокус в начало.
  */
 class HomeActivity : Activity() {
     private lateinit var config: HomeConfig
@@ -178,23 +244,66 @@ class HomeActivity : Activity() {
     private var firstPill: View? = null
     private var registered = false
 
+    // «Кино»: название приложения в фокусе и свечение в его цвете
+    private var shelfTitle: TextView? = null
+    private var shelfGlow: GradientDrawable? = null
+    private var shelfColor = Color.TRANSPARENT
+    private var glowAnimator: ValueAnimator? = null
+
+    // «Дзен»: список прокручивается так, чтобы строка в фокусе стояла по центру
+    private var listScroll: ScrollView? = null
+
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) = reload()
     }
 
-    /** Влево/вправо фокус не перескакивает в другой ряд: с последнего приложения в ряду он остаётся на месте. */
+    /**
+     * Влево/вправо фокус не перескакивает в другой ряд: с последнего приложения в ряду он остаётся на месте.
+     * В «Дзене» рядов нет (слева кнопки, справа список), там правило выключено.
+     */
     private class HomeRoot(context: Context) : FrameLayout(context) {
+        var rowLock = true
+
         override fun focusSearch(focused: View?, direction: Int): View? {
             val next = super.focusSearch(focused, direction)
             if (focused == null || next == null || next === focused) return next
             val sideways = direction == View.FOCUS_LEFT || direction == View.FOCUS_RIGHT
-            return if (sideways && !sameRow(focused, next)) focused else next
+            return when {
+                rowLock -> if (sideways && !sameRow(focused, next)) focused else next
+                // «Дзен»: вверх/вниз фокус остаётся в своей колонке — с конца списка не прыгает на кнопки слева
+                !sideways && !sameColumn(focused, next) -> focused
+                else -> next
+            }
+        }
+
+        private fun sameColumn(a: View, b: View): Boolean {
+            val pa = IntArray(2).also { a.getLocationOnScreen(it) }
+            val pb = IntArray(2).also { b.getLocationOnScreen(it) }
+            return pa[0] < pb[0] + b.width && pb[0] < pa[0] + a.width
         }
 
         private fun sameRow(a: View, b: View): Boolean {
             val pa = IntArray(2).also { a.getLocationOnScreen(it) }
             val pb = IntArray(2).also { b.getLocationOnScreen(it) }
             return pa[1] < pb[1] + b.height && pb[1] < pa[1] + a.height
+        }
+    }
+
+    /**
+     * Горизонтальная лента. Обычный HorizontalScrollView ставит элемент в фокусе вплотную к краю экрана,
+     * и его увеличенная рамка срезается. Здесь у края всегда остаётся поле [inset].
+     */
+    private class RowScroll(context: Context, private val inset: Int) : HorizontalScrollView(context) {
+        init {
+            isHorizontalScrollBarEnabled = false
+            clipToPadding = false
+            clipChildren = false
+            overScrollMode = View.OVER_SCROLL_NEVER
+        }
+
+        override fun computeScrollDeltaToGetChildRectOnScreen(rect: Rect): Int {
+            val wide = Rect(rect.left - inset, rect.top, rect.right + inset, rect.bottom)
+            return super.computeScrollDeltaToGetChildRectOnScreen(wide)
         }
     }
 
@@ -257,6 +366,7 @@ class HomeActivity : Activity() {
     }
 
     override fun onDestroy() {
+        glowAnimator?.cancel()
         scope.cancel()
         super.onDestroy()
     }
@@ -274,6 +384,14 @@ class HomeActivity : Activity() {
         }
     }
 
+    // ───────────────────────────── Сборка экрана ─────────────────────────────
+
+    private val side get() = dp(48)
+    private val gap get() = dp(16)
+
+    private fun tileWidth(columns: Int) =
+        (resources.displayMetrics.widthPixels - 2 * side - gap * (columns - 1)) / columns
+
     private fun render() {
         stamp = config.stamp
         rendered = true
@@ -282,39 +400,42 @@ class HomeActivity : Activity() {
         root.removeAllViews()
         clock = null
         date = null
+        firstPill = null
+        shelfTitle = null
+        shelfGlow = null
+        listScroll = null
+        glowAnimator?.cancel()
 
+        val layout = config.preset.layout
         val columns = config.columns
-        val gap = dp(16)
-        val side = dp(48)
-        val tileWidth = (resources.displayMetrics.widthPixels - 2 * side - gap * (columns - 1)) / columns
-        val (dock, grid) = HomeApps.arrange(apps, config, columns)
-        firstPkg = (dock.firstOrNull() ?: grid.firstOrNull())?.pkg
+        val (dock, rest) = HomeApps.arrange(apps, config, columns)
+        firstPkg = (dock.firstOrNull() ?: rest.firstOrNull())?.pkg
+        root.rowLock = layout != HomeLayout.LIST
 
-        val content = vertical {
-            addView(header(), lp().apply { bottomMargin = dp(24) })
-            if (dock.isNotEmpty()) {
-                // Полоса шире сетки на свой внутренний отступ: избранное стоит ровно над колонками
-                addView(dockRow(dock, tileWidth, gap), lp().apply {
-                    leftMargin = -dp(16)
-                    rightMargin = -dp(16)
-                    bottomMargin = dp(24)
-                })
-            }
-            grid.chunked(columns).forEach { addView(row(it, tileWidth, gap), lp().apply { bottomMargin = dp(16) }) }
-            if (dock.isEmpty() && grid.isEmpty()) {
-                addView(text(getString(R.string.home_no_apps), Type.BODY, Palette.TEXT_DIM))
-            }
+        val screen = when {
+            dock.isEmpty() && rest.isEmpty() -> emptyScreen()
+            layout == HomeLayout.GRID -> gridScreen(dock, rest, columns)
+            layout == HomeLayout.SHELF -> shelfScreen(dock + rest, columns)
+            layout == HomeLayout.LIST -> listScreen(dock + rest)
+            layout == HomeLayout.TILES -> tilesScreen(dock + rest, columns)
+            else -> rowsScreen(dock, rest, columns)
         }
-        val scroll = TvScrollView(this).apply {
-            addView(content)
-            // Безопасная зона overscan ~5 %
-            setContentPadding(side, dp(27), side, dp(27))
-        }
-        root.addView(scroll, FrameLayout.LayoutParams(MATCH, MATCH))
+        root.addView(screen, FrameLayout.LayoutParams(MATCH, MATCH))
         if (preview) {
+            // Подсказка стоит там, где в раскладке пусто: в «Дзене» по центру снизу идёт список,
+            // в «Рядах» слева снизу — кнопки настроек.
+            val place = when (layout) {
+                HomeLayout.LIST -> Gravity.START
+                HomeLayout.ROWS -> Gravity.END
+                else -> Gravity.CENTER_HORIZONTAL
+            }
             root.addView(
                 chip(getString(R.string.home_preview_hint), Palette.TEXT),
-                FrameLayout.LayoutParams(WRAP, WRAP, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply { bottomMargin = dp(20) },
+                FrameLayout.LayoutParams(WRAP, WRAP, Gravity.BOTTOM or place).apply {
+                    bottomMargin = dp(20)
+                    leftMargin = side
+                    rightMargin = side
+                },
             )
         }
         updateClock()
@@ -325,6 +446,143 @@ class HomeActivity : Activity() {
             target?.requestFocus()
         }
     }
+
+    /** Вертикальная прокрутка экрана с безопасной зоной overscan ~5 %. */
+    private fun scrolling(content: LinearLayout): View = TvScrollView(this).apply {
+        addView(content)
+        setContentPadding(side, dp(27), side, dp(27))
+    }
+
+    private fun emptyScreen(): View = scrolling(vertical {
+        addView(header(), lp().apply { bottomMargin = dp(24) })
+        addView(text(getString(R.string.home_no_apps), Type.BODY, Palette.TEXT_DIM))
+    })
+
+    /** «Док», «Чёрный OLED», «Стекло»: часы, полоса избранного, сетка. */
+    private fun gridScreen(dock: List<HomeApp>, rest: List<HomeApp>, columns: Int): View {
+        val width = tileWidth(columns)
+        return scrolling(vertical {
+            addView(header(), lp().apply { bottomMargin = dp(24) })
+            if (dock.isNotEmpty()) {
+                // Полоса шире сетки на свой внутренний отступ: избранное стоит ровно над колонками
+                addView(dockRow(dock, width), lp().apply {
+                    leftMargin = -dp(16)
+                    rightMargin = -dp(16)
+                    bottomMargin = dp(24)
+                })
+            }
+            rest.chunked(columns).forEach { addView(row(it) { app -> bannerTile(app, width) }, lp().apply { bottomMargin = dp(16) }) }
+        })
+    }
+
+    /** «Плитка»: плоские цветные плитки, название внутри. По мотивам Retro Metro. */
+    private fun tilesScreen(all: List<HomeApp>, columns: Int): View {
+        val width = tileWidth(columns)
+        return scrolling(vertical {
+            addView(header(), lp().apply { bottomMargin = dp(24) })
+            all.chunked(columns).forEach { addView(row(it) { app -> colorTile(app, width) }, lp().apply { bottomMargin = dp(16) }) }
+        })
+    }
+
+    /** «Ряды»: избранное, приложения, игры — каждый ряд листается вбок. По мотивам Leanback Launcher. */
+    private fun rowsScreen(dock: List<HomeApp>, rest: List<HomeApp>, columns: Int): View {
+        val width = tileWidth(columns)
+        val games = rest.filter { it.isGame }
+        val others = rest.filter { !it.isGame }
+        return scrolling(vertical {
+            if (config.clock) {
+                addView(horizontal {
+                    addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
+                    clock = text("", Type.TITLE, Palette.TEXT).apply {
+                        typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+                    }.also { addView(it) }
+                }, lp().apply { bottomMargin = dp(8) })
+            }
+            fun section(title: Int, body: View) {
+                addView(vertical {
+                    addView(text(getString(title), Type.SECTION, Palette.TEXT_DIM), lp().apply { bottomMargin = dp(4) })
+                    // Лента идёт от края до края экрана, хотя заголовок стоит в безопасной зоне
+                    addView(body, lp().apply {
+                        leftMargin = -side
+                        rightMargin = -side
+                    })
+                }, lp().apply { bottomMargin = dp(20) })
+            }
+            if (dock.isNotEmpty()) section(R.string.home_row_favorites, ribbon(dock) { app -> bannerTile(app, width) })
+            if (others.isNotEmpty()) section(R.string.home_row_apps, ribbon(others) { app -> bannerTile(app, width) })
+            if (games.isNotEmpty()) section(R.string.home_row_games, ribbon(games) { app -> bannerTile(app, width) })
+            section(R.string.home_row_settings, horizontal {
+                setPadding(side, dp(12), side, dp(12))
+                pills(this)
+            })
+        })
+    }
+
+    /** «Кино»: название приложения крупно, свечение в его цвете, одна лента внизу. По мотивам верхней полки CleanYourTV. */
+    private fun shelfScreen(all: List<HomeApp>, columns: Int): View {
+        val width = tileWidth(columns)
+        val screenWidth = resources.displayMetrics.widthPixels.toFloat()
+        shelfColor = Color.TRANSPARENT
+        val glow = HomeBackgrounds.glow(Color.TRANSPARENT, 0.3f, 0.35f, screenWidth * 0.75f)
+        shelfGlow = glow
+        return FrameLayout(this).apply {
+            clipChildren = false
+            addView(View(context).apply { background = glow }, FrameLayout.LayoutParams(MATCH, MATCH))
+            addView(vertical {
+                setPadding(side, dp(27), side, dp(27))
+                addView(header())
+                addView(View(context), LinearLayout.LayoutParams(1, 0, 1f))
+                shelfTitle = text("", 56f, Palette.TEXT).apply {
+                    typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                    includeFontPadding = false
+                }.also { addView(it, lp().apply { bottomMargin = dp(20) }) }
+                addView(ribbon(all) { app -> bannerTile(app, width, labelled = false) }, lp().apply {
+                    leftMargin = -side
+                    rightMargin = -side
+                    bottomMargin = dp(36)
+                })
+            }, FrameLayout.LayoutParams(MATCH, MATCH))
+        }
+    }
+
+    /** «Дзен»: только часы и список названий, без иконок. По мотивам Zen list. */
+    private fun listScreen(all: List<HomeApp>): View = horizontal {
+        setPadding(side, dp(27), side, dp(27))
+        addView(vertical {
+            gravity = Gravity.CENTER_VERTICAL
+            if (config.clock) {
+                // «12:45 PM» длиннее «12:45»: в 12-часовом формате шрифт меньше, иначе время не влезает в колонку
+                val size = if (android.text.format.DateFormat.is24HourFormat(context)) 96f else 72f
+                clock = text("", size, Palette.TEXT).apply {
+                    typeface = Typeface.create("sans-serif-thin", Typeface.NORMAL)
+                    includeFontPadding = false
+                    maxLines = 1
+                }.also { addView(it) }
+                date = text("", Type.SECTION, Palette.TEXT_DIM).also { addView(it, lp().apply { bottomMargin = dp(40) }) }
+            }
+            addView(horizontal { pills(this) })
+        }, LinearLayout.LayoutParams(0, MATCH, 1f))
+
+        val scroll = ScrollView(context).apply {
+            isVerticalScrollBarEnabled = false
+            isVerticalFadingEdgeEnabled = true
+            setFadingEdgeLength(dp(96))
+            overScrollMode = View.OVER_SCROLL_NEVER
+            clipChildren = false
+            addView(vertical {
+                // Поля сверху и снизу: первая и последняя строки тоже могут встать по центру
+                val edge = resources.displayMetrics.heightPixels / 2 - dp(60)
+                setPadding(dp(24), edge, 0, edge)
+                all.forEach { addView(listItem(it)) }
+            })
+        }
+        listScroll = scroll
+        addView(scroll, LinearLayout.LayoutParams(0, MATCH, 1f))
+    }
+
+    // ───────────────────────────── Части экрана ─────────────────────────────
 
     private fun header(): View = horizontal {
         if (config.clock) {
@@ -338,23 +596,28 @@ class HomeActivity : Activity() {
         } else {
             addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
         }
+        pills(this)
+    }
+
+    /** Две кнопки, которые есть в любой раскладке: открыть Glide TV и настройки ТВ. */
+    private fun pills(parent: LinearLayout) {
         val glide = pill(getString(R.string.app_name), R.drawable.ic_bolt) {
-            if (preview) leavePreview() else open(Intent(this@HomeActivity, MainActivity::class.java))
+            if (preview) leavePreview() else open(Intent(this, MainActivity::class.java))
         }
         firstPill = glide
-        addView(glide, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(16) })
-        addView(pill(getString(R.string.home_tv_settings), R.drawable.ic_settings) {
+        parent.addView(glide, LinearLayout.LayoutParams(WRAP, WRAP).apply { rightMargin = dp(16) })
+        parent.addView(pill(getString(R.string.home_tv_settings), R.drawable.ic_settings) {
             open(Intent(Settings.ACTION_SETTINGS))
         }, LinearLayout.LayoutParams(WRAP, WRAP))
     }
 
-    /** Кнопка в шапке: полупрозрачная, чтобы читаться на любом фоне; в фокусе — белая, как везде в Glide TV. */
+    /** Кнопка шапки: полупрозрачная, чтобы читаться на любом фоне; в фокусе — белая, как везде в Glide TV. */
     private fun pill(label: String, iconRes: Int, onClick: () -> Unit): TextView =
         actionButton(label, iconRes = iconRes, onClick = onClick).apply {
             background = focusBackground(context, Color.argb(36, 255, 255, 255), radiusDp = 28)
         }
 
-    private fun dockRow(apps: List<HomeApp>, tileWidth: Int, gap: Int): View = row(apps, tileWidth, gap).apply {
+    private fun dockRow(apps: List<HomeApp>, tileWidth: Int): View = row(apps) { app -> bannerTile(app, tileWidth) }.apply {
         val pad = dp(16)
         setPadding(pad, pad, pad, dp(8))
         val radius = dp(24).toFloat()
@@ -365,50 +628,87 @@ class HomeActivity : Activity() {
         }
     }
 
-    private fun row(apps: List<HomeApp>, tileWidth: Int, gap: Int): LinearLayout = horizontal {
+    private fun row(apps: List<HomeApp>, tile: (HomeApp) -> View): LinearLayout = horizontal {
         gravity = Gravity.TOP
         apps.forEachIndexed { i, app ->
-            addView(tile(app, tileWidth), LinearLayout.LayoutParams(tileWidth, WRAP).apply { if (i > 0) leftMargin = gap })
+            val view = tile(app)
+            // Плитка без подписи задаёт свой размер сама; остальные — по содержимому
+            val params = view.layoutParams as? LinearLayout.LayoutParams ?: LinearLayout.LayoutParams(WRAP, WRAP)
+            if (i > 0) params.leftMargin = gap
+            addView(view, params)
         }
     }
 
-    private fun tile(app: HomeApp, width: Int): View {
+    /** Лента от края до края экрана, листается вбок. */
+    private fun ribbon(apps: List<HomeApp>, tile: (HomeApp) -> View): View = RowScroll(this, side).apply {
+        addView(row(apps, tile).apply { setPadding(side, dp(12), side, dp(12)) })
+    }
+
+    private fun roundedOutline(radius: Float) = object : ViewOutlineProvider() {
+        override fun getOutline(view: View, outline: Outline) {
+            outline.setRoundRect(0, 0, view.width, view.height, radius)
+        }
+    }
+
+    /** Рамка фокуса — отдельный слой поверх картинки: View.foreground есть только с Android 6. */
+    private fun focusRing(radius: Float) = View(this).apply {
+        isDuplicateParentStateEnabled = true
+        background = StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_focused), rounded(Color.TRANSPARENT, radius, Palette.FOCUS, dp(3)))
+            addState(intArrayOf(), ColorDrawable(Color.TRANSPARENT))
+        }
+    }
+
+    /** Общее для любого элемента-приложения: фокус, запуск, меню. */
+    private fun bind(view: View, app: HomeApp, scale: Float, onFocus: (Boolean) -> Unit = {}) {
+        view.isFocusable = true
+        view.isClickable = true
+        view.contentDescription = app.label
+        view.tag = app.pkg
+        view.setOnFocusChangeListener { v, has ->
+            if (has) {
+                focusPkg = app.pkg
+                showOnShelf(app)
+            }
+            val s = if (has) scale else 1f
+            v.animate().scaleX(s).scaleY(s).setDuration(150).start()
+            onFocus(has)
+        }
+        view.setOnClickListener { open(app.launch, app.label) }
+        view.setOnLongClickListener { showMenu(app); true }
+    }
+
+    /** Баннер 16:9 с подписью под ним. */
+    private fun bannerTile(app: HomeApp, width: Int, labelled: Boolean = true): View {
         val height = width * 9 / 16
         val radius = dp(12).toFloat()
         val art = ImageView(this).apply {
             background = rounded(Color.argb(36, 255, 255, 255), radius)
+            setImageDrawable(app.art)
             if (app.banner != null) {
-                setImageDrawable(app.banner)
                 scaleType = ImageView.ScaleType.CENTER_CROP
             } else {
-                setImageDrawable(app.icon)
                 scaleType = ImageView.ScaleType.FIT_CENTER
                 val pad = height / 5
                 setPadding(pad, pad, pad, pad)
             }
-            outlineProvider = object : ViewOutlineProvider() {
-                override fun getOutline(view: View, outline: Outline) {
-                    outline.setRoundRect(0, 0, view.width, view.height, radius)
-                }
-            }
+            outlineProvider = roundedOutline(radius)
             clipToOutline = true
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-        }
-        // Рамка фокуса — отдельный слой поверх баннера: View.foreground есть только с Android 6
-        val ring = View(this).apply {
-            isDuplicateParentStateEnabled = true
-            background = StateListDrawable().apply {
-                addState(intArrayOf(android.R.attr.state_focused), rounded(Color.TRANSPARENT, radius, Palette.FOCUS, dp(3)))
-                addState(intArrayOf(), ColorDrawable(Color.TRANSPARENT))
-            }
         }
         val frame = FrameLayout(this).apply {
             isDuplicateParentStateEnabled = true
             addView(art, FrameLayout.LayoutParams(MATCH, MATCH))
-            addView(ring, FrameLayout.LayoutParams(MATCH, MATCH))
+            addView(focusRing(radius), FrameLayout.LayoutParams(MATCH, MATCH))
         }
-        val always = config.labels
-        val rest = if (always) 0.75f else 0f
+        if (!labelled) {
+            // В «Кино» название показывает полка над лентой
+            bind(frame, app, 1.08f)
+            frame.isDuplicateParentStateEnabled = false
+            frame.layoutParams = LinearLayout.LayoutParams(width, height)
+            return frame
+        }
+        val rest = if (config.labels) 0.75f else 0f
         val label = text(app.label, Type.CAPTION, Palette.TEXT).apply {
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
@@ -416,22 +716,91 @@ class HomeActivity : Activity() {
             alpha = rest
         }
         return vertical {
-            isFocusable = true
-            isClickable = true
-            contentDescription = app.label
-            tag = app.pkg
             addView(frame, LinearLayout.LayoutParams(width, height))
             addView(label, LinearLayout.LayoutParams(width, WRAP).apply { topMargin = dp(6) })
-            setOnFocusChangeListener { v, has ->
-                if (has) focusPkg = app.pkg
-                val scale = if (has) 1.08f else 1f
-                v.animate().scaleX(scale).scaleY(scale).setDuration(150).start()
-                label.animate().alpha(if (has) 1f else rest).setDuration(150).start()
-            }
-            setOnClickListener { open(app.launch, app.label) }
-            setOnLongClickListener { showMenu(app); true }
+            bind(this, app, 1.08f) { has -> label.animate().alpha(if (has) 1f else rest).setDuration(150).start() }
         }
     }
+
+    /** Плоская плитка в цвете приложения: иконка сверху, название снизу. */
+    private fun colorTile(app: HomeApp, width: Int): View {
+        val height = width * 3 / 5
+        val radius = dp(4).toFloat()
+        val pad = dp(14)
+        return FrameLayout(this).apply {
+            background = rounded(app.color, radius)
+            addView(ImageView(context).apply {
+                setImageDrawable(app.icon ?: app.banner)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            }, FrameLayout.LayoutParams(dp(44), dp(44), Gravity.TOP or Gravity.START).apply {
+                leftMargin = pad
+                topMargin = pad
+            })
+            addView(text(app.label, Type.SECONDARY, Color.WHITE, bold = true).apply {
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+            }, FrameLayout.LayoutParams(MATCH, WRAP, Gravity.BOTTOM).apply {
+                leftMargin = pad
+                rightMargin = pad
+                bottomMargin = dp(10)
+            })
+            addView(focusRing(radius), FrameLayout.LayoutParams(MATCH, MATCH))
+            bind(this, app, 1.06f)
+            layoutParams = LinearLayout.LayoutParams(width, height)
+        }
+    }
+
+    /** Строка «Дзена»: только название. Фокус — белый цвет, увеличение и метка слева (не одним цветом). */
+    private fun listItem(app: HomeApp): View {
+        val marker = View(this).apply {
+            background = rounded(Palette.ACCENT, dp(2).toFloat())
+            alpha = 0f
+        }
+        val name = text(app.label, 30f, Palette.TEXT_DIM).apply {
+            typeface = Typeface.create("sans-serif-light", Typeface.NORMAL)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+        }
+        return horizontal {
+            setPadding(0, dp(10), 0, dp(10))
+            addView(marker, LinearLayout.LayoutParams(dp(4), dp(28)).apply { rightMargin = dp(16) })
+            addView(name, LinearLayout.LayoutParams(0, WRAP, 1f))
+            bind(this, app, 1.15f) { has ->
+                name.setTextColor(if (has) Palette.TEXT else Palette.TEXT_DIM)
+                marker.animate().alpha(if (has) 1f else 0f).setDuration(150).start()
+                if (has) centerInList(this)
+            }
+            // Увеличение от левого края: строки растут вправо, а не расползаются в обе стороны
+            pivotX = 0f
+            post { pivotY = height / 2f }
+        }
+    }
+
+    private fun centerInList(item: View) {
+        val scroll = listScroll ?: return
+        scroll.post { scroll.smoothScrollTo(0, item.top + item.height / 2 - scroll.height / 2) }
+    }
+
+    /** «Кино»: показать приложение в фокусе на полке — название и свечение в его цвете. */
+    private fun showOnShelf(app: HomeApp) {
+        val title = shelfTitle ?: return
+        val glow = shelfGlow ?: return
+        title.text = app.label
+        val target = Color.argb(150, Color.red(app.color), Color.green(app.color), Color.blue(app.color))
+        glowAnimator?.cancel()
+        glowAnimator = ValueAnimator.ofArgb(shelfColor, target).apply {
+            duration = 350
+            addUpdateListener {
+                shelfColor = it.animatedValue as Int
+                glow.colors = intArrayOf(shelfColor, Color.TRANSPARENT)
+            }
+            start()
+        }
+    }
+
+    // ───────────────────────────── Действия ─────────────────────────────
 
     private fun open(intent: Intent, label: String = "") {
         runCatching { startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.onFailure {
@@ -451,9 +820,13 @@ class HomeActivity : Activity() {
         fun save(list: List<String>) {
             config.favorites = list.ifEmpty { listOf(HomeApps.NONE) }
         }
+        // В списке избранное идёт сверху вниз, в остальных раскладках — слева направо
+        val vertical = config.preset.layout == HomeLayout.LIST
+        val earlier = getString(if (vertical) R.string.home_menu_up else R.string.home_menu_left)
+        val later = getString(if (vertical) R.string.home_menu_down else R.string.home_menu_right)
         if (index >= 0) {
-            if (index > 0) items += getString(R.string.home_menu_left) to { save(favorites.moved(index, index - 1)) }
-            if (index < favorites.lastIndex) items += getString(R.string.home_menu_right) to { save(favorites.moved(index, index + 1)) }
+            if (index > 0) items += earlier to { save(favorites.moved(index, index - 1)) }
+            if (index < favorites.lastIndex) items += later to { save(favorites.moved(index, index + 1)) }
             items += getString(R.string.home_menu_fav_remove) to { save(favorites - app.pkg) }
         } else {
             // В начало ряда: в ряд помещается столько приложений, сколько колонок, и добавленное должно быть видно
