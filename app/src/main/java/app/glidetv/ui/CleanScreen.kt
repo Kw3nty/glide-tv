@@ -241,7 +241,10 @@ class CleanScreen(activity: MainActivity) : Screen(activity) {
 
     private fun renderDeleteButton() {
         val selected = adapter.checked().mapNotNull { junk[it.key] }
-        deleteButton.visibility = if (mode == Mode.JUNK && junk.isNotEmpty()) View.VISIBLE else View.GONE
+        val visible = mode == Mode.JUNK && junk.isNotEmpty()
+        // Кнопка в фокусе скрывается (удалили весь мусор) — иначе фокус улетел бы в меню на первый пункт
+        if (!visible && deleteButton.isFocused) findJunkButton.requestFocus()
+        deleteButton.visibility = if (visible) View.VISIBLE else View.GONE
         deleteButton.text = if (selected.isEmpty()) string(R.string.delete_selected_empty)
         else string(R.string.delete_selected, selected.size, Format.bytes(ctx, selected.sumOf { it.sizeBytes }))
         deleteButton.isEnabled = selected.isNotEmpty() && !busy

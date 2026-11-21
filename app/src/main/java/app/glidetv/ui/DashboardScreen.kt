@@ -160,6 +160,8 @@ class DashboardScreen(activity: MainActivity) : Screen(activity) {
     }
 
     private fun renderTurbo(kind: EngineKind) {
+        // Карточка в фокусе скрывается (Турбо подключилось в фоне) — иначе фокус улетел бы в меню
+        if (kind != EngineKind.NONE && turboCard.isFocused) optimizeButton.requestFocus()
         turboCard.visibility = if (kind == EngineKind.NONE) View.VISIBLE else View.GONE
         turboChip.text = string(R.string.turbo_card_off_title)
         turboText.text = string(R.string.turbo_card_off_text)

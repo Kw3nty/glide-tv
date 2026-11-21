@@ -57,6 +57,8 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
     private lateinit var steps: TextView
     private lateinit var connectButton: TextView
     private lateinit var pairButton: TextView
+    private lateinit var connectRow: LinearLayout
+    private lateinit var devSettingsButton: TextView
     private lateinit var rootButton: TextView
     private lateinit var connectedActions: LinearLayout
     private lateinit var pairingPanel: LinearLayout
@@ -90,16 +92,17 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
             }, 16)
 
             // Два ряда: в 600dp контентной области четыре кнопки в одну строку не помещаются
-            val actions = ctx.horizontal()
+            val actions = ctx.horizontal().also { connectRow = it }
             connectButton = ctx.actionButton(string(R.string.connect), primary = true, iconRes = R.drawable.ic_link) { connect() }
             actions.addSpaced(connectButton, 16, LinearLayout.LayoutParams(WRAP, WRAP))
             pairButton = ctx.actionButton(string(R.string.pair_by_code), iconRes = R.drawable.ic_phone) { showPairing() }
             actions.addSpaced(pairButton, 0, LinearLayout.LayoutParams(WRAP, WRAP))
             addSpaced(actions, 16)
             val more = ctx.horizontal()
-            more.addSpaced(ctx.actionButton(string(R.string.open_dev_settings), iconRes = R.drawable.ic_settings) {
+            devSettingsButton = ctx.actionButton(string(R.string.open_dev_settings), iconRes = R.drawable.ic_settings) {
                 if (!SpecialAccess.openDeveloperSettings(ctx)) state.warn(string(R.string.dev_settings_missing))
-            }, 16, LinearLayout.LayoutParams(WRAP, WRAP))
+            }
+            more.addSpaced(devSettingsButton, 16, LinearLayout.LayoutParams(WRAP, WRAP))
             rootButton = ctx.actionButton(string(R.string.use_root), iconRes = R.drawable.ic_bolt) { useRoot() }
             more.addSpaced(rootButton, 0, LinearLayout.LayoutParams(WRAP, WRAP))
             addSpaced(more, 24)
@@ -182,7 +185,9 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
         })
     }
 
-    override fun defaultFocus(): View = connectButton
+    // «Подключиться» скрыта, когда Турбо уже включено; «Для разработчиков» видна всегда и безопасна
+    override fun defaultFocus(): View =
+        if (connectButton.visibility == View.VISIBLE) connectButton else devSettingsButton
 
     override fun onShow() {
         render()
@@ -237,10 +242,24 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
                 AdbRoute.WIRELESS_PAIRING -> R.string.steps_wireless
             },
         )
-        pairButton.visibility = if (p.supportsWirelessDebugging && kind == EngineKind.NONE) View.VISIBLE else View.GONE
-        rootButton.visibility = if (graph.engines.rootAvailable && kind != EngineKind.ROOT) View.VISIBLE else View.GONE
-        connectButton.visibility = if (kind == EngineKind.NONE) View.VISIBLE else View.GONE
-        connectedActions.visibility = if (kind == EngineKind.ADB) View.VISIBLE else View.GONE
+        val pairVisible = p.supportsWirelessDebugging && kind == EngineKind.NONE
+        val rootVisible = graph.engines.rootAvailable && kind != EngineKind.ROOT
+        val connectVisible = kind == EngineKind.NONE
+        val connectedVisible = kind == EngineKind.ADB
+        // Кнопка в фокусе сейчас скроется (после подключения — «Подключиться», после «Забыть подключение» —
+        // весь ряд): система отдала бы фокус первому пункту меню. Сначала переводим его на видимую кнопку.
+        val focusWillVanish = (connectButton.isFocused && !connectVisible) ||
+            (pairButton.isFocused && !pairVisible) ||
+            (rootButton.isFocused && !rootVisible) ||
+            (connectedActions.hasFocus() && !connectedVisible)
+        if (focusWillVanish) devSettingsButton.requestFocus()
+        pairButton.visibility = if (pairVisible) View.VISIBLE else View.GONE
+        rootButton.visibility = if (rootVisible) View.VISIBLE else View.GONE
+        connectButton.visibility = if (connectVisible) View.VISIBLE else View.GONE
+        // Пустой ряд тоже скрываем: его отступ сдвигал кнопки ниже первого экрана, и при включённом Турбо
+        // экран открывался прокрученным, без заголовка
+        connectRow.visibility = if (connectVisible || pairVisible) View.VISIBLE else View.GONE
+        connectedActions.visibility = if (connectedVisible) View.VISIBLE else View.GONE
         if (kind != EngineKind.NONE) {
             pairingPanel.visibility = View.GONE
             stopPairing()
@@ -250,7 +269,10 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
     private fun connect() {
         if (busy) return
         busy = true
-        scope.launch {
+        // activity.scope, а не scope экрана: системное окно «Разрешить отладку?» ставит Activity на паузу,
+        // onPause отменяет scope экрана — и результат подключения терялся: пользователь нажимал «Разрешить»,
+        // а на экране навсегда оставалось «Подключение…» при выключенном Турбо
+        activity.scope.launch {
             try {
                 state.progress(string(R.string.connecting_confirm))
                 connectButton.isEnabled = false
@@ -345,7 +367,8 @@ class TurboScreen(activity: MainActivity) : Screen(activity) {
     }
 
     private fun useRoot() {
-        scope.launch {
+        // activity.scope по той же причине, что и в connect(): окно менеджера root ставит Activity на паузу
+        activity.scope.launch {
             state.progress(string(R.string.root_requesting))
             val ok = graph.engines.requestRoot()
             if (ok) state.success(string(R.string.turbo_state_root)) else state.error(string(R.string.root_denied))

@@ -106,7 +106,15 @@ fun View.scaleOnFocus(scale: Float = 1.04f) {
     val previous = onFocusChangeListener
     setOnFocusChangeListener { v, has ->
         previous?.onFocusChange(v, has)
-        v.animate().scaleX(if (has) scale else 1f).scaleY(if (has) scale else 1f).setDuration(150).start()
+        // Высокая карточка (журнал Турбо) при том же коэффициенте вырастает на десятки пикселей,
+        // и её рамка уходит под затухающий край прокрутки. Ограничиваем прирост 2dp с каждой стороны.
+        val maxGrow = 4f * v.resources.displayMetrics.density
+        val target = when {
+            !has -> 1f
+            v.height > 0 -> minOf(scale, 1f + maxGrow / v.height)
+            else -> scale
+        }
+        v.animate().scaleX(target).scaleY(target).setDuration(150).start()
     }
 }
 
@@ -334,6 +342,18 @@ class TvScrollView(context: Context) : ScrollView(context) {
                 content.setPadding(content.paddingLeft, content.paddingTop, content.paddingRight, bottomPadding + tail)
             }
         }
+        // Содержимое изменилось (появилась строка статуса, отчёт) и сдвинуло элемент в фокусе за край —
+        // возвращаем его на экран. Фокус при этом не менялся, поэтому сам ScrollView ничего не прокрутит.
+        val focused = findFocus()
+        if (focused != null && focused !== this) {
+            val r = Rect()
+            focused.getDrawingRect(r)
+            offsetDescendantRectToMyCoords(focused, r)
+            if (r.top < scrollY || r.bottom > scrollY + height) {
+                val delta = computeScrollDeltaToGetChildRectOnScreen(r)
+                if (delta != 0) scrollBy(0, delta)
+            }
+        }
     }
 
     private var exactTarget = false
@@ -394,7 +414,14 @@ class TvScrollView(context: Context) : ScrollView(context) {
         val maxScroll = content.height - (height - paddingTop - paddingBottom)
         if (maxScroll <= 0) return super.arrowScroll(direction)
         val current = findFocus().takeIf { it !== this }
-        val next = FocusFinder.getInstance().findNextFocus(this, current, direction)
+        val next = if (current != null) {
+            FocusFinder.getInstance().findNextFocus(this, current, direction)
+        } else {
+            // Фокус у самого экрана (кнопка уехала за край): ищем от края видимой области,
+            // а не от начала содержимого — иначе «вниз» отбросило бы к первой кнопке экрана
+            val edge = if (direction == View.FOCUS_DOWN) scrollY else scrollY + height
+            FocusFinder.getInstance().findNextFocusFromRect(this, Rect(0, edge, width, edge), direction)
+        }
         if (next != null) {
             // Прокрутку выполнит requestChildFocus → computeScrollDeltaToGetChildRectOnScreen
             return next.requestFocus(direction)
@@ -405,11 +432,12 @@ class TvScrollView(context: Context) : ScrollView(context) {
         if (target == scrollY) return false
         smoothScrollTo(scrollX, target)
         if (current != null && current.isFocused) {
-            // Кнопка в фокусе уехала за край — фокус забирает сам экран, чтобы он не был невидимым
+            // Кнопка в фокусе уезжает за край (хотя бы частично) — фокус забирает сам экран: он не должен
+            // быть невидимым, а onLayout не должен возвращать экран назад к этой кнопке
             val r = Rect()
             current.getDrawingRect(r)
             offsetDescendantRectToMyCoords(current, r)
-            if (r.bottom <= target || r.top >= target + height) {
+            if (r.top < target || r.bottom > target + height) {
                 val focusability = descendantFocusability
                 descendantFocusability = ViewGroup.FOCUS_BEFORE_DESCENDANTS
                 requestFocus()
